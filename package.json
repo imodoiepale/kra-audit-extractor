@@ -1,0 +1,65 @@
+{
+    "name": "kra-data-extractor",
+    "version": "1.0.0",
+    "description": "KRA VAT Returns and General Ledger Data Extractor",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "dev": "electron . --dev",
+        "build": "electron-builder",
+        "dist": "electron-builder --publish=never"
+    },
+    "keywords": [
+        "kra",
+        "vat",
+        "ledger",
+        "extraction",
+        "kenya"
+    ],
+    "author": "Your Name",
+    "license": "MIT",
+    "devDependencies": {
+        "electron": "^27.3.11",
+        "electron-builder": "^24.13.3"
+    },
+    "dependencies": {
+        "exceljs": "^4.4.0",
+        "playwright": "^1.55.0",
+        "tesseract.js": "^5.1.1"
+    },
+    "build": {
+        "appId": "com.yourcompany.kra-extractor",
+        "productName": "KRA Data Extractor",
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "main.js",
+            "renderer.js",
+            "index.html",
+            "styles.css",
+            "extractor.js",
+            "node_modules/**/*"
+        ],
+        "win": {
+            "target": "nsis",
+            "icon": "assets/icon.ico"
+        },
+        "mac": {
+            "target": "dmg",
+            "icon": "assets/icon.icns"
+        },
+        "linux": {
+            "target": "AppImage",
+            "icon": "assets/icon.png"
+        }
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/imodoiepale/kra-audit-extractor.git"
+    },
+    "bugs": {
+        "url": "https://github.com/imodoiepale/kra-audit-extractor/issues"
+    },
+    "homepage": "https://github.com/imodoiepale/kra-audit-extractor#readme"
+}

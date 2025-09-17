@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRA Data Extractor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>KRA Data Extractor</h1>
+            <p>Extract VAT Returns and General Ledger data from KRA iTax Portal</p>
+        </header>
+
+        <main>
+            <div class="form-section">
+                <h2>Company Configuration</h2>
+                <div class="form-group">
+                    <label for="companyName">Company Name:</label>
+                    <input type="text" id="companyName" value="SHLOKI ENTERPRISES LIMITED" required>
+                </div>
+                <div class="form-group">
+                    <label for="kraPin">KRA PIN:</label>
+                    <input type="text" id="kraPin" value="P051766288C" required>
+                </div>
+                <div class="form-group">
+                    <label for="kraPassword">KRA Password:</label>
+                    <input type="password" id="kraPassword" value="Shloki1234" required>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Extraction Type</h2>
+                <div class="extraction-type">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="extractVAT" checked>
+                        <label for="extractVAT">VAT Returns</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="extractLedger" checked>
+                        <label for="extractLedger">General Ledger</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Date Range Configuration</h2>
+                <div class="date-range">
+                    <div class="date-option">
+                        <input type="radio" id="allData" name="dateRange" value="all" checked>
+                        <label for="allData">Extract All Available Data</label>
+                    </div>
+                    <div class="date-option">
+                        <input type="radio" id="customRange" name="dateRange" value="custom">
+                        <label for="customRange">Custom Date Range</label>
+                    </div>
+                </div>
+                
+                <div id="customDateInputs" class="custom-date-inputs" style="display: none;">
+                    <div class="date-inputs">
+                        <div class="date-group">
+                            <label for="startYear">From Year:</label>
+                            <input type="number" id="startYear" min="2010" max="2030" value="2024">
+                        </div>
+                        <div class="date-group">
+                            <label for="startMonth">From Month:</label>
+                            <select id="startMonth">
+                                <option value="1">January</option>
+                                <option value="2">February</option>
+                                <option value="3">March</option>
+                                <option value="4">April</option>
+                                <option value="5">May</option>
+                                <option value="6">June</option>
+                                <option value="7">July</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                        </div>
+                        <div class="date-group">
+                            <label for="endYear">To Year:</label>
+                            <input type="number" id="endYear" min="2010" max="2030" value="2024">
+                        </div>
+                        <div class="date-group">
+                            <label for="endMonth">To Month:</label>
+                            <select id="endMonth">
+                                <option value="1">January</option>
+                                <option value="2">February</option>
+                                <option value="3">March</option>
+                                <option value="4">April</option>
+                                <option value="5">May</option>
+                                <option value="6">June</option>
+                                <option value="7">July</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12" selected>December</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Download Configuration</h2>
+                <div class="form-group">
+                    <label for="downloadPath">Download Folder:</label>
+                    <div class="path-selector">
+                        <input type="text" id="downloadPath" readonly placeholder="Select download folder...">
+                        <button type="button" id="selectFolder">Browse</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="outputFormat">Output Format:</label>
+                    <select id="outputFormat">
+                        <option value="individual">Individual Files per Company</option>
+                        <option value="separate_sheets">Combined File with Separate Sheets</option>
+                        <option value="single_sheet">Combined File with Single Sheet</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="action-section">
+                <button id="startExtraction" class="primary-btn" disabled>Start Extraction</button>
+                <button id="runAll" class="secondary-btn">Run All Extractions</button>
+                <button id="saveConfig" class="tertiary-btn">Save Configuration</button>
+                <button id="loadConfig" class="tertiary-btn">Load Configuration</button>
+            </div>
+
+            <div id="progressSection" class="progress-section" style="display: none;">
+                <h3>Extraction Progress</h3>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <div id="progressText" class="progress-text">Initializing...</div>
+                <div id="progressLog" class="progress-log"></div>
+            </div>
+
+            <div id="results" class="results-section" style="display: none;">
+                <h3>Extraction Results</h3>
+                <div id="resultContent"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
