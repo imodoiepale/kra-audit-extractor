@@ -839,3 +839,90 @@ header {
     color: #ffc107;
     font-weight: 600;
 }
+
+/* Summary Section Styling */
+.summary-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 15px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.summary-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.summary-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.summary-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #495057;
+}
+
+.total-amount {
+    color: #dc3545 !important;
+    font-size: 20px !important;
+}
+
+.amount-cell {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+}
+
+.total-row {
+    background-color: #f8f9fa;
+    border-top: 2px solid #dee2e6;
+}
+
+.total-row td {
+    font-weight: 700;
+    padding: 15px 12px;
+}
+
+.no-data-message {
+    text-align: center;
+    padding: 30px;
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 8px;
+    margin: 15px 0;
+}
+
+.no-data-message p {
+    font-size: 16px;
+    color: #155724;
+    margin: 0;
+}
+
+.extraction-info {
+    margin-top: 15px;
+    padding: 10px;
+    background: #e9ecef;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.extraction-info small {
+    color: #6c757d;
+    font-size: 12px;
+}

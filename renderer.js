@@ -1673,24 +1673,83 @@ async function showMessage(options) {
 function displayLiabilitiesResults(result) {
     if (!elements.liabilitiesResults) return;
 
+    // Extract data from result if available
+    const liabilitiesData = result.data || [];
+    const totalAmount = result.totalAmount || 0;
+    const recordCount = liabilitiesData.length || 0;
+
     let tableHtml = `
-        <h4>Liabilities Extraction Results</h4>
-        <table class="results-table">
-            <thead>
+        <h4>Outstanding Liabilities</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Outstanding</span>
+                <span class="summary-value total-amount">KES ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Records Found</span>
+                <span class="summary-value">${recordCount}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
+    `;
+
+    if (recordCount > 0) {
+        tableHtml += `
+            <!-- Detailed Liabilities Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Tax Type</th>
+                        <th>Period</th>
+                        <th>Due Date</th>
+                        <th>Amount (KES)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        liabilitiesData.forEach(liability => {
+            const amount = parseFloat(liability.amount || 0);
+            tableHtml += `
                 <tr>
-                    <th>Status</th>
-                    <th>Files Generated</th>
-                    <th>Download Path</th>
+                    <td>${liability.taxType || 'N/A'}</td>
+                    <td>${liability.period || 'N/A'}</td>
+                    <td>${liability.dueDate || 'N/A'}</td>
+                    <td class="amount-cell">${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td><span class="warning-status">Outstanding</span></td>
                 </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><span class="success-status">✓ Completed</span></td>
-                    <td>${result.files ? result.files.length : 1} file(s)</td>
-                    <td>${result.downloadPath || 'Default location'}</td>
-                </tr>
-            </tbody>
-        </table>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td colspan="3"><strong>TOTAL OUTSTANDING</strong></td>
+                        <td class="amount-cell total-amount"><strong>KES ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>✅ No outstanding liabilities found. Your account is up to date!</p>
+            </div>
+        `;
+    }
+
+    tableHtml += `
+        <div class="extraction-info">
+            <small>📁 Excel file saved to: ${result.downloadPath || 'Default location'}</small>
+        </div>
     `;
 
     elements.liabilitiesResults.innerHTML = tableHtml;

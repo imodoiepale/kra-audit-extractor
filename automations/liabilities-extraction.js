@@ -81,7 +81,15 @@ async function runLiabilitiesExtraction(company, downloadPath, progressCallback)
         await browser.close();
 
         progressCallback({ stage: 'Liabilities', message: 'Liabilities extraction completed successfully.', progress: 100 });
-        return { success: true, message: 'Liabilities extracted successfully.', files: [results.filePath], downloadPath: downloadFolderPath };
+        return { 
+            success: true, 
+            message: 'Liabilities extracted successfully.', 
+            files: [results.filePath], 
+            downloadPath: downloadFolderPath,
+            data: results.data,
+            totalAmount: results.totalAmount,
+            recordCount: results.recordCount
+        };
 
     } catch (error) {
         if (browser) {
@@ -232,6 +240,9 @@ async function processCompany(page, company, downloadFolderPath, progressCallbac
 
     addSectionHeader(worksheet, "Outstanding Liabilities", !!liabilitiesTable);
 
+    let extractedData = [];
+    let totalAmount = 0;
+
     if (liabilitiesTable) {
         progressCallback({ log: 'Extracting liabilities data from table...' });
         
@@ -249,8 +260,6 @@ async function processCompany(page, company, downloadFolderPath, progressCallbac
             )
         );
 
-        let totalAmount = 0;
-
         tableContent.forEach(rowData => {
             const excelRow = worksheet.addRow(["", "", ...rowData]);
             applyBorders(excelRow, "C", "F", "thin");
@@ -260,6 +269,15 @@ async function processCompany(page, company, downloadFolderPath, progressCallbac
             if (!isNaN(amountValue)) {
                 totalAmount += amountValue;
             }
+
+            // Store extracted data for UI display
+            extractedData.push({
+                taxType: rowData[0] || 'N/A',
+                period: rowData[1] || 'N/A',
+                dueDate: rowData[2] || 'N/A',
+                amount: amountValue || 0,
+                status: 'Outstanding'
+            });
 
             const amountCell = excelRow.getCell('F');
             amountCell.numFmt = '#,##0.00';
@@ -275,7 +293,7 @@ async function processCompany(page, company, downloadFolderPath, progressCallbac
         totalAmountCell.font = { bold: true };
         totalAmountCell.alignment = { horizontal: 'right' };
 
-        progressCallback({ log: `Extracted ${tableContent.length} liability records with total amount: ${totalAmount.toLocaleString()}` });
+        progressCallback({ log: `Extracted ${tableContent.length} liability records with total amount: KES ${totalAmount.toLocaleString()}` });
     } else {
         addNoDataRow(worksheet, "No outstanding liabilities records found.");
         progressCallback({ log: 'No liabilities table found on the page' });
@@ -294,7 +312,12 @@ async function processCompany(page, company, downloadFolderPath, progressCallbac
     await page.evaluate(() => { logOutUser(); });
     await page.waitForLoadState("load");
     
-    return { filePath };
+    return { 
+        filePath,
+        data: extractedData,
+        totalAmount: totalAmount,
+        recordCount: extractedData.length
+    };
 }
 
 // Helper functions for Excel formatting
