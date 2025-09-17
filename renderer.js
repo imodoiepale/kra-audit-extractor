@@ -1465,6 +1465,7 @@ async function runLedgerExtraction() {
         
         if (result.success) {
             appState.ledgerData = result.data || { completed: true }; // Save ledger data to app state
+            displayLedgerResults(result);
             hideProgressSection();
             await showMessage({
                 type: 'info',
@@ -1754,6 +1755,15 @@ function displayLiabilitiesResults(result) {
 
     elements.liabilitiesResults.innerHTML = tableHtml;
     elements.liabilitiesResults.classList.remove('hidden');
+}
+
+function displayLedgerResults(result) {
+    // For now, show a simple success message since ledger extraction doesn't have a specific results element
+    // You can add a ledgerResults element to the HTML if needed
+    console.log('Ledger extraction completed successfully:', result);
+    
+    // Update the UI state to show the green checkmark
+    updateUIState();
 }
 
 // Initialize the application when DOM is loaded
