@@ -3,148 +3,296 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KRA Data Extractor</title>
+    <title>KRA Automation Suite</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>KRA Data Extractor</h1>
-            <p>Extract VAT Returns and General Ledger data from KRA iTax Portal</p>
+            <div class="header-content">
+                <h1>KRA Automation Suite</h1>
+                <p>Streamlined KRA iTax Portal Automation</p>
+            </div>
         </header>
 
+        <nav class="automation-tabs">
+            <button class="tab-btn active" data-tab="company-setup">
+                <span class="tab-number">1</span>
+                <span class="tab-title">Setup</span>
+            </button>
+            <button class="tab-btn" data-tab="password-validation">
+                <span class="tab-number">2</span>
+                <span class="tab-title">Validate</span>
+            </button>
+            <button class="tab-btn" data-tab="manufacturer-details">
+                <span class="tab-number">3</span>
+                <span class="tab-title">Details</span>
+            </button>
+            <button class="tab-btn" data-tab="vat-returns">
+                <span class="tab-number">4</span>
+                <span class="tab-title">VAT</span>
+            </button>
+            <button class="tab-btn" data-tab="general-ledger">
+                <span class="tab-number">5</span>
+                <span class="tab-title">Ledger</span>
+            </button>
+            <button class="tab-btn" data-tab="all-automations">
+                <span class="tab-number">6</span>
+                <span class="tab-title">Run All</span>
+            </button>
+        </nav>
+
         <main>
-            <div class="form-section">
-                <h2>Company Configuration</h2>
-                <div class="form-group">
-                    <label for="companyName">Company Name:</label>
-                    <input type="text" id="companyName" value="SHLOKI ENTERPRISES LIMITED" required>
-                </div>
-                <div class="form-group">
-                    <label for="kraPin">KRA PIN:</label>
-                    <input type="text" id="kraPin" value="P051766288C" required>
-                </div>
-                <div class="form-group">
-                    <label for="kraPassword">KRA Password:</label>
-                    <input type="password" id="kraPassword" value="Shloki1234" required>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <h2>Extraction Type</h2>
-                <div class="extraction-type">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="extractVAT" checked>
-                        <label for="extractVAT">VAT Returns</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="extractLedger" checked>
-                        <label for="extractLedger">General Ledger</label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <h2>Date Range Configuration</h2>
-                <div class="date-range">
-                    <div class="date-option">
-                        <input type="radio" id="allData" name="dateRange" value="all" checked>
-                        <label for="allData">Extract All Available Data</label>
-                    </div>
-                    <div class="date-option">
-                        <input type="radio" id="customRange" name="dateRange" value="custom">
-                        <label for="customRange">Custom Date Range</label>
-                    </div>
-                </div>
-                
-                <div id="customDateInputs" class="custom-date-inputs" style="display: none;">
-                    <div class="date-inputs">
-                        <div class="date-group">
-                            <label for="startYear">From Year:</label>
-                            <input type="number" id="startYear" min="2010" max="2030" value="2024">
+            <!-- Step 1: Company Setup -->
+            <div id="company-setup" class="tab-content active">
+                <div class="form-section compact">
+                    <h2>Company Setup</h2>
+                    <p class="step-description">Enter your KRA credentials to get started</p>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kraPin">KRA PIN</label>
+                            <input type="text" id="kraPin" placeholder="P051766288C" required>
                         </div>
-                        <div class="date-group">
-                            <label for="startMonth">From Month:</label>
-                            <select id="startMonth">
-                                <option value="1">January</option>
-                                <option value="2">February</option>
-                                <option value="3">March</option>
-                                <option value="4">April</option>
-                                <option value="5">May</option>
-                                <option value="6">June</option>
-                                <option value="7">July</option>
-                                <option value="8">August</option>
-                                <option value="9">September</option>
-                                <option value="10">October</option>
-                                <option value="11">November</option>
-                                <option value="12">December</option>
-                            </select>
-                        </div>
-                        <div class="date-group">
-                            <label for="endYear">To Year:</label>
-                            <input type="number" id="endYear" min="2010" max="2030" value="2024">
-                        </div>
-                        <div class="date-group">
-                            <label for="endMonth">To Month:</label>
-                            <select id="endMonth">
-                                <option value="1">January</option>
-                                <option value="2">February</option>
-                                <option value="3">March</option>
-                                <option value="4">April</option>
-                                <option value="5">May</option>
-                                <option value="6">June</option>
-                                <option value="7">July</option>
-                                <option value="8">August</option>
-                                <option value="9">September</option>
-                                <option value="10">October</option>
-                                <option value="11">November</option>
-                                <option value="12" selected>December</option>
-                            </select>
+                        
+                        <div class="form-group">
+                            <label for="kraPassword">Password</label>
+                            <input type="password" id="kraPassword" placeholder="Enter password" required>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <div class="form-section">
-                <h2>Download Configuration</h2>
-                <div class="form-group">
-                    <label for="downloadPath">Download Folder:</label>
-                    <div class="path-selector">
-                        <input type="text" id="downloadPath" readonly placeholder="Select download folder...">
-                        <button type="button" id="selectFolder">Browse</button>
+                    <div class="action-group">
+                        <button id="fetchCompanyDetails" class="primary-btn">Get Company Details</button>
+                        <button id="validateCredentials" class="secondary-btn">Validate Login</button>
+                    </div>
+
+                    <div id="companyDetailsResult" class="result-section hidden">
+                        <h3>Company Information</h3>
+                        <div id="companyInfo" class="info-display"></div>
+                        <button id="confirmCompanyDetails" class="success-btn">Confirm & Continue</button>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="outputFormat">Output Format:</label>
-                    <select id="outputFormat">
-                        <option value="individual">Individual Files per Company</option>
-                        <option value="separate_sheets">Combined File with Separate Sheets</option>
-                        <option value="single_sheet">Combined File with Single Sheet</option>
-                    </select>
+            </div>
+
+            <!-- Step 2: Password Validation -->
+            <div id="password-validation" class="tab-content">
+                <div class="form-section compact">
+                    <h2>Credential Validation</h2>
+                    <p class="step-description">Verify your KRA account status</p>
+                    
+                    <div class="status-grid">
+                        <div class="status-card">
+                            <span class="status-label">Company</span>
+                            <span id="validationCompanyName" class="status-value">-</span>
+                        </div>
+                        <div class="status-card">
+                            <span class="status-label">PIN</span>
+                            <span id="validationPIN" class="status-value">-</span>
+                        </div>
+                        <div class="status-card">
+                            <span class="status-label">Status</span>
+                            <span id="validationResult" class="status-value">-</span>
+                        </div>
+                    </div>
+
+                    <div class="action-group">
+                        <button id="runPasswordValidation" class="primary-btn" disabled>Run Validation</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="action-section">
-                <button id="startExtraction" class="primary-btn" disabled>Start Extraction</button>
-                <button id="runAll" class="secondary-btn">Run All Extractions</button>
-                <button id="saveConfig" class="tertiary-btn">Save Configuration</button>
-                <button id="loadConfig" class="tertiary-btn">Load Configuration</button>
+            <!-- Step 3: Manufacturer Details -->
+            <div id="manufacturer-details" class="tab-content">
+                <div class="form-section compact">
+                    <h2>Manufacturer Details</h2>
+                    <p class="step-description">Fetch complete business information</p>
+                    
+                    <div class="action-group">
+                        <button id="fetchManufacturerDetails" class="primary-btn" disabled>Fetch Details</button>
+                        <button id="exportManufacturerDetails" class="tertiary-btn hidden">Export Excel</button>
+                    </div>
+
+                    <div id="manufacturerDetailsResult" class="result-section hidden">
+                        <h3>Business Information</h3>
+                        <div id="manufacturerInfo" class="details-grid"></div>
+                    </div>
+                </div>
             </div>
 
-            <div id="progressSection" class="progress-section" style="display: none;">
-                <h3>Extraction Progress</h3>
-                <div class="progress-bar">
-                    <div id="progressFill" class="progress-fill"></div>
+            <!-- Step 4: VAT Returns -->
+            <div id="vat-returns" class="tab-content">
+                <div class="form-section compact">
+                    <h2>VAT Returns</h2>
+                    <p class="step-description">Extract VAT return data</p>
+                    
+                    <div class="option-group">
+                        <label class="option-card">
+                            <input type="radio" name="vatDateRange" value="all" checked>
+                            <span class="option-content">
+                                <strong>All Data</strong>
+                                <small>Extract everything available</small>
+                            </span>
+                        </label>
+                        
+                        <label class="option-card">
+                            <input type="radio" name="vatDateRange" value="custom">
+                            <span class="option-content">
+                                <strong>Custom Range</strong>
+                                <small>Specify date range</small>
+                            </span>
+                        </label>
+                    </div>
+                    
+                    <div id="vatCustomDateInputs" class="custom-date-inputs hidden">
+                        <div class="date-row">
+                            <div class="date-group">
+                                <label for="vatStartYear">From</label>
+                                <select id="vatStartMonth">
+                                    <option value="1">Jan</option>
+                                    <option value="2">Feb</option>
+                                    <option value="3">Mar</option>
+                                    <option value="4">Apr</option>
+                                    <option value="5">May</option>
+                                    <option value="6">Jun</option>
+                                    <option value="7">Jul</option>
+                                    <option value="8">Aug</option>
+                                    <option value="9">Sep</option>
+                                    <option value="10">Oct</option>
+                                    <option value="11">Nov</option>
+                                    <option value="12">Dec</option>
+                                </select>
+                                <input type="number" id="vatStartYear" min="2010" max="2030" value="2024">
+                            </div>
+                            <div class="date-group">
+                                <label for="vatEndYear">To</label>
+                                <select id="vatEndMonth">
+                                    <option value="1">Jan</option>
+                                    <option value="2">Feb</option>
+                                    <option value="3">Mar</option>
+                                    <option value="4">Apr</option>
+                                    <option value="5">May</option>
+                                    <option value="6">Jun</option>
+                                    <option value="7">Jul</option>
+                                    <option value="8">Aug</option>
+                                    <option value="9">Sep</option>
+                                    <option value="10">Oct</option>
+                                    <option value="11">Nov</option>
+                                    <option value="12" selected>Dec</option>
+                                </select>
+                                <input type="number" id="vatEndYear" min="2010" max="2030" value="2024">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-group">
+                        <button id="runVATExtraction" class="primary-btn" disabled>Extract VAT Data</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5: General Ledger -->
+            <div id="general-ledger" class="tab-content">
+                <div class="form-section compact">
+                    <h2>General Ledger</h2>
+                    <p class="step-description">Extract ledger transactions</p>
+                    
+                    <div class="action-group">
+                        <button id="runLedgerExtraction" class="primary-btn" disabled>Extract Ledger</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 6: Run All Automations -->
+            <div id="all-automations" class="tab-content">
+                <div class="form-section compact">
+                    <h2>Run All Automations</h2>
+                    <p class="step-description">Execute multiple processes</p>
+                    
+                    <div class="checklist-grid">
+                        <label class="checklist-card">
+                            <input type="checkbox" id="includePasswordValidation" checked>
+                            <span class="checklist-content">
+                                <strong>Password Check</strong>
+                                <small>Validate credentials</small>
+                            </span>
+                        </label>
+                        
+                        <label class="checklist-card">
+                            <input type="checkbox" id="includeManufacturerDetails" checked>
+                            <span class="checklist-content">
+                                <strong>Company Details</strong>
+                                <small>Fetch business info</small>
+                            </span>
+                        </label>
+                        
+                        <label class="checklist-card">
+                            <input type="checkbox" id="includeVATReturns" checked>
+                            <span class="checklist-content">
+                                <strong>VAT Returns</strong>
+                                <small>Extract VAT data</small>
+                            </span>
+                        </label>
+                        
+                        <label class="checklist-card">
+                            <input type="checkbox" id="includeGeneralLedger" checked>
+                            <span class="checklist-content">
+                                <strong>General Ledger</strong>
+                                <small>Extract transactions</small>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="action-group">
+                        <button id="runAllAutomations" class="primary-btn" disabled>Run Selected</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Global Progress Section -->
+            <div id="progressSection" class="progress-section hidden">
+                <div class="progress-header">
+                    <h3>Processing...</h3>
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
                 </div>
                 <div id="progressText" class="progress-text">Initializing...</div>
                 <div id="progressLog" class="progress-log"></div>
             </div>
 
-            <div id="results" class="results-section" style="display: none;">
-                <h3>Extraction Results</h3>
+            <!-- Global Results Section -->
+            <div id="results" class="results-section hidden">
+                <h3>Results</h3>
                 <div id="resultContent"></div>
             </div>
         </main>
+
+        <!-- Compact Configuration Panel -->
+        <div class="config-panel compact">
+            <div class="config-header">
+                <h3>Settings</h3>
+            </div>
+            <div class="config-content">
+                <div class="form-group">
+                    <label for="downloadPath">Download Folder</label>
+                    <div class="path-selector">
+                        <input type="text" id="downloadPath" readonly placeholder="Select folder...">
+                        <button type="button" id="selectFolder" class="icon-btn">📁</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="outputFormat">Format</label>
+                    <select id="outputFormat">
+                        <option value="individual">Individual Files</option>
+                        <option value="combined">Combined Report</option>
+                    </select>
+                </div>
+                <div class="config-actions">
+                    <button id="saveConfig" class="tertiary-btn">Save</button>
+                    <button id="loadConfig" class="tertiary-btn">Load</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="renderer.js"></script>
