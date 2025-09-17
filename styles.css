@@ -823,3 +823,19 @@ header {
         font-size: 11px;
     }
 }
+
+/* Success Status Styling */
+.success-status {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.error-status {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.warning-status {
+    color: #ffc107;
+    font-weight: 600;
+}

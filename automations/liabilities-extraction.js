@@ -5,6 +5,54 @@ const os = require("os");
 const ExcelJS = require("exceljs");
 const { createWorker } = require('tesseract.js');
 
+// Constants and date formatting
+const now = new Date();
+const formattedDateTime = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
+let hours = now.getHours();
+const ampm = hours < 12 ? 'AM' : 'PM';
+hours = hours % 12 || 12; // Convert to 12-hour format
+const formattedDateTime2 = `${now.getDate()}.${(now.getMonth() + 1)}.${now.getFullYear()} ${hours}_${now.getMinutes()} ${ampm}`;
+
+// Utility functions for Excel formatting
+function highlightCells(row, startCol, endCol, color, bold = false) {
+    for (let col = startCol.charCodeAt(0); col <= endCol.charCodeAt(0); col++) {
+        const cell = row.getCell(String.fromCharCode(col));
+        cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: color }
+        };
+        if (bold) {
+            cell.font = { bold: true };
+        }
+    }
+}
+
+function applyBorders(row, startCol, endCol, style = "thin") {
+    for (let col = startCol.charCodeAt(0); col <= endCol.charCodeAt(0); col++) {
+        const cell = row.getCell(String.fromCharCode(col));
+        cell.border = {
+            top: { style },
+            left: { style },
+            bottom: { style },
+            right: { style }
+        };
+    }
+}
+
+function autoFitColumns(worksheet) {
+    worksheet.columns.forEach(column => {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: false }, cell => {
+            let cellLength = cell.value ? cell.value.toString().length : 0;
+            if (cellLength > maxLength) {
+                maxLength = cellLength;
+            }
+        });
+        column.width = Math.min(50, Math.max(12, maxLength + 2)); // Set a minimum width
+    });
+}
+
 // Main function to run the liabilities extraction
 async function runLiabilitiesExtraction(company, downloadPath, progressCallback) {
     // Create a company-specific subfolder within the user-selected download path
@@ -33,7 +81,7 @@ async function runLiabilitiesExtraction(company, downloadPath, progressCallback)
         await browser.close();
 
         progressCallback({ stage: 'Liabilities', message: 'Liabilities extraction completed successfully.', progress: 100 });
-        return { success: true, message: 'Liabilities extracted successfully.', files: [results.filePath] };
+        return { success: true, message: 'Liabilities extracted successfully.', files: [results.filePath], downloadPath: downloadFolderPath };
 
     } catch (error) {
         if (browser) {
@@ -145,120 +193,127 @@ async function loginToKRA(page, company, downloadFolderPath, progressCallback) {
 
 // Process a single company
 async function processCompany(page, company, downloadFolderPath, progressCallback) {
-    progressCallback({ log: 'Navigating to Payment Registration form...' });
-    await page.hover("#ddtopmenubar > ul > li:nth-child(6) > a");
-    await page.evaluate(() => { showPaymentRegForm(); });
-    await page.click("#openPayRegForm");
-    page.once("dialog", dialog => { dialog.accept().catch(() => {}); });
-    await page.click("#openPayRegForm");
-    page.once("dialog", dialog => { dialog.accept().catch(() => {}); });
+    progressCallback({ log: `Processing company: ${company.name}` });
 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(`Liabilities - ${company.pin}`);
-    
-    // Process Income Tax
-    progressCallback({ log: 'Extracting Income Tax liabilities...' });
-    await extractLiability(page, worksheet, 'IT', '4', 'Income Tax - Company');
+    const worksheet = workbook.addWorksheet(`LIABILITIES-${formattedDateTime}`);
 
-    // Process VAT
-    progressCallback({ log: 'Extracting VAT liabilities...' });
-    await extractLiability(page, worksheet, 'VAT', '9', 'VAT');
+    // Add title row
+    const titleRow = worksheet.addRow(["", "KRA LIABILITIES EXTRACTION REPORT", "", `Extraction Date: ${formattedDateTime}`]);
+    worksheet.mergeCells('B1:C1');
+    titleRow.getCell('B').font = { size: 14, bold: true };
+    titleRow.getCell('B').alignment = { horizontal: 'center' };
+    highlightCells(titleRow, "B", "F", "FF87CEEB", true);
+    applyBorders(titleRow, "B", "F", "thin");
+    worksheet.addRow();
 
-    // Process PAYE
-    progressCallback({ log: 'Extracting PAYE liabilities...' });
-    await extractLiability(page, worksheet, 'IT', '7', 'PAYE');
+    // Add company info row
+    const companyNameRow = worksheet.addRow(["1", company.name, `Extraction Date: ${formattedDateTime}`]);
+    worksheet.mergeCells(`C${companyNameRow.number}:J${companyNameRow.number}`);
+    highlightCells(companyNameRow, "B", "F", "FFADD8E6", true);
+    applyBorders(companyNameRow, "A", "F", "thin");
 
+    if (!company.pin || !(company.pin.startsWith("P") || company.pin.startsWith("A"))) {
+        progressCallback({ log: `Skipping ${company.name}: Invalid KRA PIN` });
+        addNoDataRow(worksheet, "Invalid or Missing KRA PIN");
+        worksheet.addRow([]);
+        const filePath = path.join(downloadFolderPath, `AUTO-EXTRACT-LIABILITIES-${formattedDateTime}.xlsx`);
+        await workbook.xlsx.writeFile(filePath);
+        return { filePath };
+    }
+
+    progressCallback({ log: 'Navigating to VAT Refund section...' });
+    await page.hover("#ddtopmenubar > ul > li:nth-child(6) > a");
+    await page.evaluate(() => { showVATRefund(); });
+    await page.waitForTimeout(3000);
+
+    // Extract data from the specific table with id="3"
+    const liabilitiesTable = await page.waitForSelector("table#\\33", { state: "visible", timeout: 5000 }).catch(() => null);
+
+    addSectionHeader(worksheet, "Outstanding Liabilities", !!liabilitiesTable);
+
+    if (liabilitiesTable) {
+        progressCallback({ log: 'Extracting liabilities data from table...' });
+        
+        const headers = await liabilitiesTable.evaluate(table =>
+            Array.from(table.querySelectorAll("thead th")).map(th => th.innerText.trim())
+        );
+
+        const headersRow = worksheet.addRow(["", "", ...headers]);
+        highlightCells(headersRow, "C", "F", "FFD3D3D3", true);
+        applyBorders(headersRow, "C", "F", "thin");
+
+        const tableContent = await liabilitiesTable.evaluate(table =>
+            Array.from(table.querySelectorAll("tbody tr")).map(row =>
+                Array.from(row.querySelectorAll("td")).map(cell => cell.innerText.trim())
+            )
+        );
+
+        let totalAmount = 0;
+
+        tableContent.forEach(rowData => {
+            const excelRow = worksheet.addRow(["", "", ...rowData]);
+            applyBorders(excelRow, "C", "F", "thin");
+
+            const amountText = rowData[3] || '0';
+            const amountValue = parseFloat(amountText.replace(/,/g, ''));
+            if (!isNaN(amountValue)) {
+                totalAmount += amountValue;
+            }
+
+            const amountCell = excelRow.getCell('F');
+            amountCell.numFmt = '#,##0.00';
+            amountCell.alignment = { horizontal: 'right' };
+        });
+
+        const totalRow = worksheet.addRow(["", "", "TOTAL", "", "", totalAmount]);
+        highlightCells(totalRow, "C", "F", "FFE4EE99", true);
+        applyBorders(totalRow, "C", "F", "thin");
+
+        const totalAmountCell = totalRow.getCell('F');
+        totalAmountCell.numFmt = '#,##0.00';
+        totalAmountCell.font = { bold: true };
+        totalAmountCell.alignment = { horizontal: 'right' };
+
+        progressCallback({ log: `Extracted ${tableContent.length} liability records with total amount: ${totalAmount.toLocaleString()}` });
+    } else {
+        addNoDataRow(worksheet, "No outstanding liabilities records found.");
+        progressCallback({ log: 'No liabilities table found on the page' });
+    }
+
+    worksheet.addRow([]);
+
+    // Auto-fit columns and save file
     autoFitColumns(worksheet);
-    const filePath = path.join(downloadFolderPath, `Liabilities_${company.pin}_${Date.now()}.xlsx`);
+    const filePath = path.join(downloadFolderPath, `AUTO-EXTRACT-LIABILITIES-${formattedDateTime}.xlsx`);
     await workbook.xlsx.writeFile(filePath);
-
+    
+    progressCallback({ log: `Excel file saved: ${filePath}` });
+    
+    // Logout
+    await page.evaluate(() => { logOutUser(); });
+    await page.waitForLoadState("load");
+    
     return { filePath };
 }
 
-async function extractLiability(page, worksheet, taxHead, taxSubHead, sectionTitle) {
-    await page.locator("#cmbTaxHead").selectOption(taxHead);
-    await page.waitForTimeout(1000);
-
-    const optionExists = await page.locator(`#cmbTaxSubHead option[value='${taxSubHead}']`).count() > 0;
-    if (!optionExists) {
-        addNoDataRow(worksheet, `${sectionTitle} option not available for this company`);
-        return;
-    }
-    await page.locator("#cmbTaxSubHead").selectOption(taxSubHead);
-    await page.locator("#cmbPaymentType").selectOption("SAT");
-
-    const liabilitiesTable = await page.waitForSelector("#LiablibilityTbl", { state: "visible", timeout: 3000 }).catch(() => null);
-    if (!liabilitiesTable) {
-        addNoDataRow(worksheet, `No records found for ${sectionTitle} Liabilities`);
-        return;
-    }
-
-    const headers = await liabilitiesTable.evaluate(table => Array.from(table.querySelectorAll("thead tr th")).map(th => th.innerText.trim()));
-    const tableContent = await liabilitiesTable.evaluate(table => {
-        return Array.from(table.querySelectorAll("tbody tr")).map(row => {
-            return Array.from(row.querySelectorAll("td")).map(cell => cell.querySelector('input[type="text"]') ? cell.querySelector('input[type="text"]').value.trim() : cell.innerText.trim());
-        });
-    });
-
-    addSectionHeader(worksheet, sectionTitle);
-    const headersRow = worksheet.addRow(headers.slice(1));
-    highlightCells(headersRow, 'A', 'I', 'FFD3D3D3', true);
-
-    tableContent.slice(1).forEach(row => {
-        const excelRow = worksheet.addRow(row.slice(1));
-        applyBorders(excelRow, 'A', 'I');
-        formatCurrencyCells(excelRow, 'E', 'E');
-    });
-}
-
-// Excel utility functions
-function highlightCells(row, startCol, endCol, color, bold = false) {
-    for (let col = startCol.charCodeAt(0); col <= endCol.charCodeAt(0); col++) {
-        const cell = row.getCell(String.fromCharCode(col));
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } };
-        if (bold) cell.font = { bold: true };
-    }
-}
-
-function applyBorders(row, startCol, endCol, style = "thin") {
-    for (let col = startCol.charCodeAt(0); col <= endCol.charCodeAt(0); col++) {
-        const cell = row.getCell(String.fromCharCode(col));
-        cell.border = { top: { style }, left: { style }, bottom: { style }, right: { style } };
-    }
-}
-
-function formatCurrencyCells(row, startCol, endCol) {
-    for (let col = startCol.charCodeAt(0); col <= endCol.charCodeAt(0); col++) {
-        const cell = row.getCell(String.fromCharCode(col));
-        cell.numFmt = '#,##0.00';
-        cell.alignment = { horizontal: 'right' };
-    }
-}
-
-function autoFitColumns(worksheet) {
-    worksheet.columns.forEach(column => {
-        let maxLength = 0;
-        column.eachCell({ includeEmpty: true }, cell => {
-            let cellLength = cell.value ? cell.value.toString().length : 0;
-            if (cellLength > maxLength) maxLength = cellLength;
-        });
-        column.width = Math.min(50, Math.max(10, maxLength + 2));
-    });
-}
-
-function addSectionHeader(worksheet, sectionTitle) {
-    const headerRow = worksheet.addRow([sectionTitle]);
-    worksheet.mergeCells(headerRow.number, 1, headerRow.number, 9);
-    highlightCells(headerRow, 'A', 'I', 'FFADD8E6', true);
-    headerRow.getCell(1).alignment = { horizontal: 'center' };
-    worksheet.addRow([]);
+// Helper functions for Excel formatting
+function addSectionHeader(worksheet, sectionTitle, isSuccess = true) {
+    const headerRow = worksheet.addRow(["", "", sectionTitle]);
+    worksheet.mergeCells(`C${headerRow.number}:J${headerRow.number}`);
+    const bgColor = isSuccess ? "FF90EE90" : "FFFF7474"; // Green for success, Red for failure
+    highlightCells(headerRow, "C", "F", bgColor, true);
+    applyBorders(headerRow, "C", "F", "thin");
+    headerRow.getCell('C').alignment = { horizontal: 'left', vertical: 'middle' };
+    headerRow.height = 20;
 }
 
 function addNoDataRow(worksheet, message) {
-    const noDataRow = worksheet.addRow([message]);
-    worksheet.mergeCells(noDataRow.number, 1, noDataRow.number, 9);
-    highlightCells(noDataRow, 'A', 'I', 'FFFFF2F2');
-    worksheet.addRow([]);
+    const noDataRow = worksheet.addRow(["", "", message]);
+    worksheet.mergeCells(`C${noDataRow.number}:J${noDataRow.number}`);
+    highlightCells(noDataRow, "C", "F", "FFFFF2F2");
+    applyBorders(noDataRow, "C", "F", "thin");
+    noDataRow.getCell('C').alignment = { horizontal: 'left', vertical: 'middle' };
 }
 
 module.exports = { runLiabilitiesExtraction };

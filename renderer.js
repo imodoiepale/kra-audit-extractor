@@ -1354,6 +1354,7 @@ async function runLiabilitiesExtraction() {
         
         if (result.success) {
             appState.liabilitiesData = result.data || { completed: true }; // Save liabilities data to app state
+            displayLiabilitiesResults(result);
             hideProgressSection();
             await showMessage({
                 type: 'info',
@@ -1667,6 +1668,33 @@ async function showMessage(options) {
     // Simple alert for now - can be enhanced with custom modal
     const icon = options.type === 'error' ? '❌' : options.type === 'warning' ? '⚠️' : 'ℹ️';
     alert(`${icon} ${options.title}\n\n${options.message}`);
+}
+
+function displayLiabilitiesResults(result) {
+    if (!elements.liabilitiesResults) return;
+
+    let tableHtml = `
+        <h4>Liabilities Extraction Results</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Files Generated</th>
+                    <th>Download Path</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="success-status">✓ Completed</span></td>
+                    <td>${result.files ? result.files.length : 1} file(s)</td>
+                    <td>${result.downloadPath || 'Default location'}</td>
+                </tr>
+            </tbody>
+        </table>
+    `;
+
+    elements.liabilitiesResults.innerHTML = tableHtml;
+    elements.liabilitiesResults.classList.remove('hidden');
 }
 
 // Initialize the application when DOM is loaded
