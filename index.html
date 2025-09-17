@@ -28,16 +28,24 @@
                 <span class="tab-number">3</span>
                 <span class="tab-title">Details</span>
             </button>
-            <button class="tab-btn" data-tab="vat-returns">
+            <button class="tab-btn" data-tab="obligation-checker">
                 <span class="tab-number">4</span>
+                <span class="tab-title">Obligations</span>
+            </button>
+            <button class="tab-btn" data-tab="liabilities">
+                <span class="tab-number">5</span>
+                <span class="tab-title">Liabilities</span>
+            </button>
+            <button class="tab-btn" data-tab="vat-returns">
+                <span class="tab-number">6</span>
                 <span class="tab-title">VAT</span>
             </button>
             <button class="tab-btn" data-tab="general-ledger">
-                <span class="tab-number">5</span>
+                <span class="tab-number">7</span>
                 <span class="tab-title">Ledger</span>
             </button>
             <button class="tab-btn" data-tab="all-automations">
-                <span class="tab-number">6</span>
+                <span class="tab-number">8</span>
                 <span class="tab-title">Run All</span>
             </button>
         </nav>
@@ -119,7 +127,34 @@
                 </div>
             </div>
 
-            <!-- Step 4: VAT Returns -->
+            <!-- Step 4: Obligation Checker -->
+            <div id="obligation-checker" class="tab-content">
+                <div class="form-section compact">
+                    <h2>Obligation Checker</h2>
+                    <p class="step-description">Check the company's tax obligations</p>
+                    <div class="action-group">
+                        <button id="runObligationCheck" class="primary-btn" disabled>Run Obligation Check</button>
+                    </div>
+                    <div id="obligationResults" class="result-section hidden"></div>
+                </div>
+            </div>
+
+            <!-- Step 5: Liabilities -->
+            <div id="liabilities" class="tab-content">
+                <div class="form-section compact">
+                    <h2>Liabilities Extraction</h2>
+                    <p class="step-description">Extract Income Tax, VAT, and PAYE liabilities</p>
+                    <div class="action-group">
+                        <button id="runLiabilitiesExtraction" class="primary-btn" disabled>Extract Liabilities</button>
+                    </div>
+                    
+                    <div id="liabilitiesResults" class="result-section hidden">
+                        <!-- Liabilities results will be displayed here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5: VAT Returns -->
             <div id="vat-returns" class="tab-content">
                 <div class="form-section compact">
                     <h2>VAT Returns</h2>
@@ -222,6 +257,22 @@
                             <span class="checklist-content">
                                 <strong>Company Details</strong>
                                 <small>Fetch business info</small>
+                            </span>
+                        </label>
+                        
+                        <label class="checklist-card">
+                            <input type="checkbox" id="includeObligationCheck" checked>
+                            <span class="checklist-content">
+                                <strong>Obligation Check</strong>
+                                <small>Check tax obligations</small>
+                            </span>
+                        </label>
+                        
+                        <label class="checklist-card">
+                            <input type="checkbox" id="includeLiabilities" checked>
+                            <span class="checklist-content">
+                                <strong>Liabilities</strong>
+                                <small>Extract liabilities data</small>
                             </span>
                         </label>
                         

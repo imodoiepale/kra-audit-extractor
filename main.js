@@ -159,11 +159,35 @@ ipcMain.handle('run-ledger-extraction', async (event, { company, downloadPath })
   }
 });
 
-// Run all automations handler
+// Run all automations handler (optimized single session)
 ipcMain.handle('run-all-automations', async (event, { company, selectedAutomations, dateRange, downloadPath }) => {
   try {
-    const { runAllAutomations } = require('./automations/run-all');
-    return await runAllAutomations(company, selectedAutomations, dateRange, downloadPath, (progress) => {
+    const { runAllAutomationsOptimized } = require('./automations/run-all-optimized');
+    return await runAllAutomationsOptimized(company, selectedAutomations, dateRange, downloadPath, (progress) => {
+      mainWindow.webContents.send('automation-progress', progress);
+    });
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Obligation checker handler
+ipcMain.handle('run-obligation-check', async (event, { company }) => {
+  try {
+    const { runObligationCheck } = require('./automations/obligation-checker');
+    return await runObligationCheck(company, (progress) => {
+      mainWindow.webContents.send('automation-progress', progress);
+    });
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Liabilities extraction handler
+ipcMain.handle('run-liabilities-extraction', async (event, { company, downloadPath }) => {
+  try {
+    const { runLiabilitiesExtraction } = require('./automations/liabilities-extraction');
+    return await runLiabilitiesExtraction(company, downloadPath, (progress) => {
       mainWindow.webContents.send('automation-progress', progress);
     });
   } catch (error) {

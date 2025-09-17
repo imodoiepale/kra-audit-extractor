@@ -8,6 +8,11 @@ let appState = {
     companyData: null,
     manufacturerData: null,
     validationStatus: null,
+    hasValidation: false, // Initialize hasValidation
+    obligationData: null, // Add obligation data
+    liabilitiesData: null, // Add liabilities data
+    vatData: null, // Add VAT data
+    ledgerData: null, // Add ledger data
     automationResults: {},
     isProcessing: false
 };
@@ -39,7 +44,15 @@ const elements = {
     manufacturerDetailsResult: document.getElementById('manufacturerDetailsResult'),
     manufacturerInfo: document.getElementById('manufacturerInfo'),
     
-    // Step 4: VAT Returns
+    // Step 4: Obligation Checker
+    runObligationCheck: document.getElementById('runObligationCheck'),
+    obligationResults: document.getElementById('obligationResults'),
+
+    // Step 5: Liabilities
+    runLiabilitiesExtraction: document.getElementById('runLiabilitiesExtraction'),
+    liabilitiesResults: document.getElementById('liabilitiesResults'),
+    
+    // Step 5: VAT Returns
     vatDateRange: document.getElementsByName('vatDateRange'),
     vatCustomDateInputs: document.getElementById('vatCustomDateInputs'),
     vatStartYear: document.getElementById('vatStartYear'),
@@ -51,9 +64,11 @@ const elements = {
     // Step 5: General Ledger
     runLedgerExtraction: document.getElementById('runLedgerExtraction'),
     
-    // Step 6: Run All
+    // Step 8: Run All
     includePasswordValidation: document.getElementById('includePasswordValidation'),
     includeManufacturerDetails: document.getElementById('includeManufacturerDetails'),
+    includeObligationCheck: document.getElementById('includeObligationCheck'),
+    includeLiabilities: document.getElementById('includeLiabilities'),
     includeVATReturns: document.getElementById('includeVATReturns'),
     includeGeneralLedger: document.getElementById('includeGeneralLedger'),
     runAllAutomations: document.getElementById('runAllAutomations'),
@@ -79,7 +94,7 @@ function init() {
     console.log('Initializing KRA Automation Suite...');
     setupEventListeners();
     setDefaultDownloadPath();
-    loadSavedConfig();
+    // loadSavedConfig(); // Prevents loading old data on startup
     updateUIState();
 }
 
@@ -120,8 +135,18 @@ function setupEventListeners() {
     if (elements.exportManufacturerDetails) {
         elements.exportManufacturerDetails.addEventListener('click', exportManufacturerDetails);
     }
+
+    // Step 4: Obligation Checker
+    if (elements.runObligationCheck) {
+        elements.runObligationCheck.addEventListener('click', runObligationCheck);
+    }
     
-    // Step 4: VAT Returns
+    // Step 5: Liabilities
+    if (elements.runLiabilitiesExtraction) {
+        elements.runLiabilitiesExtraction.addEventListener('click', runLiabilitiesExtraction);
+    }
+
+    // Step 5: VAT Returns
     elements.vatDateRange.forEach(radio => {
         radio.addEventListener('change', toggleVATDateInputs);
     });
@@ -185,9 +210,11 @@ function switchTab(tabId) {
         'company-setup': 1,
         'password-validation': 2,
         'manufacturer-details': 3,
-        'vat-returns': 4,
-        'general-ledger': 5,
-        'all-automations': 6
+        'obligation-checker': 4,
+        'liabilities': 5,
+        'vat-returns': 6,
+        'general-ledger': 7,
+        'all-automations': 8
     };
     appState.currentStep = stepMap[tabId] || 1;
 }
@@ -204,7 +231,7 @@ function setDefaultDownloadPath() {
 function updateUIState() {
     const hasCredentials = elements.kraPin?.value.trim() && elements.kraPassword?.value.trim();
     const hasCompanyData = appState.companyData !== null;
-    const hasValidation = appState.validationStatus === 'Valid';
+    const hasValidation = appState.hasValidation;
     
     // Step 1 buttons
     if (elements.fetchCompanyDetails) {
@@ -221,10 +248,20 @@ function updateUIState() {
     
     // Step 3 buttons
     if (elements.fetchManufacturerDetails) {
-        elements.fetchManufacturerDetails.disabled = !hasCredentials || appState.isProcessing;
+        elements.fetchManufacturerDetails.disabled = !hasCompanyData || appState.isProcessing;
     }
-    
-    // Step 4 buttons
+
+    // Step 4: Obligation Checker
+    if (elements.runObligationCheck) {
+        elements.runObligationCheck.disabled = !hasCredentials || appState.isProcessing;
+    }
+
+    // Step 5: Liabilities
+    if (elements.runLiabilitiesExtraction) {
+        elements.runLiabilitiesExtraction.disabled = !hasValidation || appState.isProcessing;
+    }
+
+    // Step 5: VAT Returns
     if (elements.runVATExtraction) {
         elements.runVATExtraction.disabled = !hasValidation || appState.isProcessing;
     }
@@ -241,6 +278,62 @@ function updateUIState() {
     
     // Update tab completion status
     updateTabCompletionStatus();
+
+    // Update tab states (e.g., add checkmarks for completed steps)
+    const validationTab = document.querySelector('[data-tab="password-validation"]');
+    if (validationTab) {
+        if (appState.hasValidation) {
+            validationTab.classList.add('completed');
+        } else {
+            validationTab.classList.remove('completed');
+        }
+    }
+
+    const detailsTab = document.querySelector('[data-tab="manufacturer-details"]');
+    if (detailsTab) {
+        if (appState.manufacturerDetails) {
+            detailsTab.classList.add('completed');
+            displayManufacturerDetails(appState.manufacturerDetails);
+        } else {
+            detailsTab.classList.remove('completed');
+        }
+    }
+
+    const obligationTab = document.querySelector('[data-tab="obligation-checker"]');
+    if (obligationTab) {
+        if (appState.obligationData) {
+            obligationTab.classList.add('completed');
+        } else {
+            obligationTab.classList.remove('completed');
+        }
+    }
+
+    const liabilitiesTab = document.querySelector('[data-tab="liabilities"]');
+    if (liabilitiesTab) {
+        if (appState.liabilitiesData) {
+            liabilitiesTab.classList.add('completed');
+        } else {
+            liabilitiesTab.classList.remove('completed');
+        }
+    }
+
+    const vatTab = document.querySelector('[data-tab="vat-returns"]');
+    if (vatTab) {
+        if (appState.vatData) {
+            vatTab.classList.add('completed');
+        } else {
+            vatTab.classList.remove('completed');
+        }
+    }
+
+    const ledgerTab = document.querySelector('[data-tab="general-ledger"]');
+    if (ledgerTab) {
+        if (appState.ledgerData) {
+            ledgerTab.classList.add('completed');
+        } else {
+            ledgerTab.classList.remove('completed');
+        }
+    }
 }
 
 // Update tab completion status
@@ -303,6 +396,17 @@ async function fetchCompanyDetails() {
         const result = await ipcRenderer.invoke('fetch-manufacturer-details', { pin });
 
         if (result.success && result.data) {
+            // Reset related state when fetching new company details
+            appState.validationStatus = null;
+            appState.hasValidation = false; // Reset validation status
+            appState.manufacturerData = null;
+            appState.obligationData = null; // Reset obligation data
+            appState.liabilitiesData = null; // Reset liabilities data
+            appState.vatData = null; // Reset VAT data
+            appState.ledgerData = null; // Reset ledger data
+            updateValidationDisplay({ status: 'Not Validated' });
+            if (elements.manufacturerInfo) elements.manufacturerInfo.innerHTML = ''; // Clear previous manufacturer details
+
             const data = result.data;
             appState.companyData = {
                 pin: pin,
@@ -346,7 +450,7 @@ async function fetchCompanyDetails() {
 // Display company details
 function displayCompanyDetails(company) {
     if (!elements.companyInfo) return;
-    
+
     elements.companyInfo.innerHTML = `
         <div class="details-grid">
             <div class="detail-item">
@@ -384,17 +488,17 @@ function displayCompanyDetails(company) {
 // Step 1: Validate credentials
 async function validateCredentials() {
     console.log('Validate Credentials clicked');
-    
+
     if (!appState.companyData) {
         await fetchCompanyDetails();
         if (!appState.companyData) return;
     }
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Validating KRA credentials...');
-        
+
         const result = await ipcRenderer.invoke('validate-kra-credentials', {
             pin: appState.companyData.pin,
             password: appState.companyData.password,
@@ -403,6 +507,7 @@ async function validateCredentials() {
 
         if (result.success) {
             appState.validationStatus = result.status;
+            appState.hasValidation = result.status === 'Valid';
             updateValidationDisplay(result);
             hideProgressSection();
 
@@ -431,10 +536,10 @@ async function validateCredentials() {
 // Update validation display
 function updateValidationDisplay(result) {
     if (elements.validationCompanyName) {
-        elements.validationCompanyName.textContent = appState.companyData.name;
+        elements.validationCompanyName.textContent = appState.companyData?.name || '-';
     }
     if (elements.validationPIN) {
-        elements.validationPIN.textContent = appState.companyData.pin;
+        elements.validationPIN.textContent = appState.companyData?.pin || '-';
     }
     if (elements.validationResult) {
         elements.validationResult.textContent = result.status;
@@ -442,87 +547,653 @@ function updateValidationDisplay(result) {
     }
 }
 
-// Confirm company details and proceed
-function confirmCompanyDetails() {
-    if (!appState.companyData) return;
-    
-    showMessage({
-        type: 'info',
-        title: 'Company Confirmed',
-        message: 'Company details confirmed. You can now proceed with other automations.'
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
     });
-    
-    // Auto-switch to password validation tab
-    switchTab('password-validation');
-    updateUIState();
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
 }
 
-// Placeholder functions for other automations
-async function runPasswordValidation() {
+// Display manufacturer details
+function displayManufacturerDetails(data) {
+    appState.manufacturerDetails = data; // Save details to app state
+    if (!elements.manufacturerInfo) return;
+
+    const basic = data.timsManBasicRDtlDTO || {};
+    const business = data.manBusinessRDtlDTO || {};
+    const contact = data.manContactRDtlDTO || {};
+    const address = data.manAddRDtlDTO || {};
+
+    elements.manufacturerInfo.innerHTML = `
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Manufacturer Name:</span>
+                <span class="detail-value">${basic.manufacturerName || 'N/A'}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Business Reg. No:</span>
+                <span class="detail-value">${basic.manufacturerBrNo || 'N/A'}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Business Name:</span>
+                <span class="detail-value">${business.businessName || 'N/A'}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Mobile:</span>
+                <span class="detail-value">${contact.mobileNo || 'N/A'}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Email:</span>
+                <span class="detail-value">${contact.mainEmail || 'N/A'}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Address:</span>
+                <span class="detail-value">${address.descriptiveAddress || 'N/A'}</span>
+            </div>
+        </div>
+    `;
+    if (elements.manufacturerDetailsResult) {
+        elements.manufacturerDetailsResult.classList.remove('hidden');
+    }
+}
+
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
+}
+
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
+}
+
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
+}
+
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
+}
+
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
+}
+
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
+}
+
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
+}
+
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
+}
+
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
+}
+
+function displayObligationResults(data) {
+    if (!elements.obligationResults) return;
+
+    const obligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
+        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
+        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
+        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
+    ];
+
+    let tableHtml = `
+        <h4>Obligation Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Status</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    obligations.forEach(ob => {
+        tableHtml += `
+            <tr>
+                <td>${ob.name}</td>
+                <td>${ob.status || 'N/A'}</td>
+                <td>${ob.from || 'N/A'}</td>
+                <td>${ob.to || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    elements.obligationResults.innerHTML = tableHtml;
+    elements.obligationResults.classList.remove('hidden');
+}
+
+// Step 1: Confirm company details
+async function confirmCompanyDetails() {
+    console.log('Confirm Company Details clicked');
+    
     if (!appState.companyData) {
         await showMessage({
             type: 'error',
-            title: 'Missing Information',
-            message: 'Please fetch and confirm company details first.'
+            title: 'Error',
+            message: 'No company data to confirm. Please fetch company details first.'
         });
         return;
     }
+    
+    // Move to next step
+    switchTab('password-validation');
+}
 
+// Step 2: Run password validation
+async function runPasswordValidation() {
+    console.log('Run Password Validation clicked');
+    
+    if (!appState.companyData) {
+        await showMessage({
+            type: 'error',
+            title: 'Error',
+            message: 'Please set up company details first.'
+        });
+        return;
+    }
+    
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Running password validation...');
-
-        const result = await ipcRenderer.invoke('run-password-validation', { company: appState.companyData });
-
+        
+        const result = await ipcRenderer.invoke('run-password-validation', {
+            company: {
+                pin: appState.companyData.pin,
+                password: appState.companyData.password,
+                name: appState.companyData.name
+            }
+        });
+        
         if (result.success) {
             appState.validationStatus = result.status;
+            appState.hasValidation = result.status === 'Valid';
             updateValidationDisplay(result);
             hideProgressSection();
+            
             await showMessage({
                 type: result.status === 'Valid' ? 'info' : 'warning',
                 title: 'Validation Complete',
-                message: `Validation status: ${result.status}`
+                message: `Password validation completed. Status: ${result.status}`
             });
         } else {
             throw new Error(result.error || 'Password validation failed');
         }
     } catch (error) {
         console.error('Error running password validation:', error);
-        hideProgressSection();
         await showMessage({
             type: 'error',
-            title: 'Automation Error',
-            message: `Password validation failed: ${error.message}`
+            title: 'Validation Error',
+            message: `Failed to run password validation: ${error.message}`
         });
+        hideProgressSection();
     } finally {
         appState.isProcessing = false;
         updateUIState();
     }
 }
 
+// Step 3: Fetch manufacturer details
 async function fetchManufacturerDetails() {
-    const pin = elements.kraPin?.value.trim();
-    if (!pin) {
+    console.log('Fetch Manufacturer Details clicked');
+    
+    if (!appState.companyData) {
         await showMessage({
             type: 'error',
-            title: 'Validation Error',
-            message: 'Please enter a KRA PIN.'
+            title: 'Error',
+            message: 'Please set up company details first.'
         });
         return;
     }
-
+    
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Fetching manufacturer details...');
-
-        const result = await ipcRenderer.invoke('fetch-manufacturer-details', { pin });
-
+        
+        const result = await ipcRenderer.invoke('fetch-manufacturer-details', {
+            pin: appState.companyData.pin
+        });
+        
         if (result.success && result.data) {
             appState.manufacturerData = result.data;
-            // You might want to display this data in the UI
+            displayManufacturerDetails(result.data);
             hideProgressSection();
+            
             await showMessage({
                 type: 'info',
                 title: 'Success',
@@ -533,212 +1204,436 @@ async function fetchManufacturerDetails() {
         }
     } catch (error) {
         console.error('Error fetching manufacturer details:', error);
-        hideProgressSection();
         await showMessage({
             type: 'error',
-            title: 'Automation Error',
+            title: 'Error',
             message: `Failed to fetch manufacturer details: ${error.message}`
         });
+        hideProgressSection();
     } finally {
         appState.isProcessing = false;
         updateUIState();
     }
 }
 
+// Step 3: Export manufacturer details
 async function exportManufacturerDetails() {
+    console.log('Export Manufacturer Details clicked');
+    
     if (!appState.manufacturerData) {
         await showMessage({
             type: 'error',
-            title: 'Missing Information',
-            message: 'Please fetch manufacturer details first.'
+            title: 'Error',
+            message: 'No manufacturer data to export. Please fetch details first.'
         });
         return;
     }
-
-    const downloadPath = elements.downloadPath.value;
-    if (!downloadPath) {
-        await showMessage({
-            type: 'error',
-            title: 'Missing Information',
-            message: 'Please select a download path.'
-        });
-        return;
-    }
-
+    
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Exporting manufacturer details...');
-
+        
         const result = await ipcRenderer.invoke('export-manufacturer-details', {
             data: appState.manufacturerData,
-            pin: appState.companyData.pin,
-            downloadPath: downloadPath
+            companyName: appState.companyData?.name || 'Unknown'
         });
-
+        
         if (result.success) {
             hideProgressSection();
             await showMessage({
                 type: 'info',
-                title: 'Export Successful',
-                message: `Manufacturer details exported to: ${result.filePath}`
+                title: 'Export Complete',
+                message: `Manufacturer details exported successfully to: ${result.filePath}`
             });
         } else {
-            throw new Error(result.error || 'Failed to export manufacturer details');
+            throw new Error(result.error || 'Export failed');
         }
     } catch (error) {
         console.error('Error exporting manufacturer details:', error);
-        hideProgressSection();
         await showMessage({
             type: 'error',
             title: 'Export Error',
-            message: `Failed to export: ${error.message}`
+            message: `Failed to export manufacturer details: ${error.message}`
         });
+        hideProgressSection();
     } finally {
         appState.isProcessing = false;
         updateUIState();
     }
 }
 
-async function runVATExtraction() {
-    if (!appState.companyData) {
-        await showMessage({ type: 'error', title: 'Missing Information', message: 'Please fetch and confirm company details first.' });
+// Step 4: Run obligation check
+async function runObligationCheck() {
+    console.log('Run Obligation Check clicked');
+    
+    // Check if we have the required credentials
+    const pin = elements.kraPin?.value?.trim();
+    const password = elements.kraPassword?.value?.trim();
+    
+    if (!pin || !password) {
+        await showMessage({
+            type: 'error',
+            title: 'Missing Credentials',
+            message: 'Please enter both KRA PIN and password before running obligation check.'
+        });
         return;
     }
-
-    const dateRange = getVatDateRange();
-    const downloadPath = elements.downloadPath.value;
-
+    
+    // Use company data if available, otherwise use form inputs
+    const companyName = appState.companyData?.name || 'Unknown Company';
+    
     try {
         appState.isProcessing = true;
         updateUIState();
-        showProgressSection('Running VAT extraction...');
-
-        const result = await ipcRenderer.invoke('run-vat-extraction', { company: appState.companyData, dateRange, downloadPath });
-
+        showProgressSection('Running obligation check...');
+        
+        const result = await ipcRenderer.invoke('run-obligation-check', {
+            company: {
+                pin: pin,
+                password: password,
+                name: companyName
+            }
+        });
+        
         if (result.success) {
-            appState.automationResults.vat = true;
+            appState.obligationData = result.data; // Save obligation data to app state
+            displayObligationResults(result.data);
             hideProgressSection();
-            showResults(result);
+            
+            await showMessage({
+                type: 'info',
+                title: 'Obligation Check Complete',
+                message: 'Obligation check completed successfully!'
+            });
+        } else {
+            throw new Error(result.error || 'Obligation check failed');
+        }
+    } catch (error) {
+        console.error('Error running obligation check:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Obligation Check Error',
+            message: `Failed to run obligation check: ${error.message}`
+        });
+        hideProgressSection();
+    } finally {
+        appState.isProcessing = false;
+        updateUIState();
+    }
+}
+
+// Step 5: Run liabilities extraction
+async function runLiabilitiesExtraction() {
+    console.log('Run Liabilities Extraction clicked');
+    
+    if (!appState.companyData || !appState.hasValidation) {
+        await showMessage({
+            type: 'error',
+            title: 'Error',
+            message: 'Please validate credentials first before running liabilities extraction.'
+        });
+        return;
+    }
+    
+    try {
+        appState.isProcessing = true;
+        updateUIState();
+        showProgressSection('Extracting liabilities...');
+        
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+        
+        const result = await ipcRenderer.invoke('run-liabilities-extraction', {
+            company: {
+                pin: appState.companyData.pin,
+                password: appState.companyData.password,
+                name: appState.companyData.name
+            },
+            downloadPath: downloadPath
+        });
+        
+        if (result.success) {
+            appState.liabilitiesData = result.data || { completed: true }; // Save liabilities data to app state
+            hideProgressSection();
+            await showMessage({
+                type: 'info',
+                title: 'Liabilities Extraction Complete',
+                message: `Liabilities extracted successfully! Files saved to: ${result.downloadPath}`
+            });
+        } else {
+            throw new Error(result.error || 'Liabilities extraction failed');
+        }
+    } catch (error) {
+        console.error('Error running liabilities extraction:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Liabilities Extraction Error',
+            message: `Failed to extract liabilities: ${error.message}`
+        });
+        hideProgressSection();
+    } finally {
+        appState.isProcessing = false;
+        updateUIState();
+    }
+}
+
+// Step 6: Run VAT extraction
+async function runVATExtraction() {
+    console.log('Run VAT Extraction clicked');
+    
+    if (!appState.companyData || !appState.hasValidation) {
+        await showMessage({
+            type: 'error',
+            title: 'Error',
+            message: 'Please validate credentials first before running VAT extraction.'
+        });
+        return;
+    }
+    
+    try {
+        appState.isProcessing = true;
+        updateUIState();
+        showProgressSection('Extracting VAT returns...');
+        
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+        const dateRange = { type: 'all' }; // Default to all records
+        
+        const result = await ipcRenderer.invoke('run-vat-extraction', {
+            company: {
+                pin: appState.companyData.pin,
+                password: appState.companyData.password,
+                name: appState.companyData.name
+            },
+            dateRange: dateRange,
+            downloadPath: downloadPath
+        });
+        
+        if (result.success) {
+            appState.vatData = result.data || { completed: true }; // Save VAT data to app state
+            hideProgressSection();
+            await showMessage({
+                type: 'info',
+                title: 'VAT Extraction Complete',
+                message: `VAT returns extracted successfully! Files saved to: ${result.downloadPath}`
+            });
         } else {
             throw new Error(result.error || 'VAT extraction failed');
         }
     } catch (error) {
         console.error('Error running VAT extraction:', error);
+        await showMessage({
+            type: 'error',
+            title: 'VAT Extraction Error',
+            message: `Failed to extract VAT returns: ${error.message}`
+        });
         hideProgressSection();
-        await showMessage({ type: 'error', title: 'Automation Error', message: `VAT extraction failed: ${error.message}` });
     } finally {
         appState.isProcessing = false;
         updateUIState();
     }
 }
 
+// Step 7: Run ledger extraction
 async function runLedgerExtraction() {
-    if (!appState.companyData) {
-        await showMessage({ type: 'error', title: 'Missing Information', message: 'Please fetch and confirm company details first.' });
+    console.log('Run Ledger Extraction clicked');
+    
+    if (!appState.companyData || !appState.hasValidation) {
+        await showMessage({
+            type: 'error',
+            title: 'Error',
+            message: 'Please validate credentials first before running ledger extraction.'
+        });
         return;
     }
-
-    const downloadPath = elements.downloadPath.value;
-
+    
     try {
         appState.isProcessing = true;
         updateUIState();
-        showProgressSection('Running general ledger extraction...');
-
-        const result = await ipcRenderer.invoke('run-ledger-extraction', { company: appState.companyData, downloadPath });
-
+        showProgressSection('Extracting general ledger...');
+        
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+        
+        const result = await ipcRenderer.invoke('run-ledger-extraction', {
+            company: {
+                pin: appState.companyData.pin,
+                password: appState.companyData.password,
+                name: appState.companyData.name
+            },
+            downloadPath: downloadPath
+        });
+        
         if (result.success) {
-            appState.automationResults.ledger = true;
+            appState.ledgerData = result.data || { completed: true }; // Save ledger data to app state
             hideProgressSection();
-            showResults(result);
+            await showMessage({
+                type: 'info',
+                title: 'Ledger Extraction Complete',
+                message: `General ledger extracted successfully! Files saved to: ${result.downloadPath}`
+            });
         } else {
             throw new Error(result.error || 'Ledger extraction failed');
         }
     } catch (error) {
         console.error('Error running ledger extraction:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Ledger Extraction Error',
+            message: `Failed to extract general ledger: ${error.message}`
+        });
         hideProgressSection();
-        await showMessage({ type: 'error', title: 'Automation Error', message: `Ledger extraction failed: ${error.message}` });
     } finally {
         appState.isProcessing = false;
         updateUIState();
     }
 }
 
+// Step 8: Run all automations
 async function runAllAutomations() {
-    if (!appState.companyData) {
-        await showMessage({ type: 'error', title: 'Missing Information', message: 'Please fetch and confirm company details first.' });
+    console.log('Run All Automations clicked');
+    
+    if (!appState.companyData || !appState.hasValidation) {
+        await showMessage({
+            type: 'error',
+            title: 'Error',
+            message: 'Please validate credentials first before running all automations.'
+        });
         return;
     }
-
+    
     const selectedAutomations = {
-        passwordValidation: elements.includePasswordValidation.checked,
-        manufacturerDetails: elements.includeManufacturerDetails.checked,
-        vatReturns: elements.includeVATReturns.checked,
-        generalLedger: elements.includeGeneralLedger.checked
+        passwordValidation: elements.includePasswordValidation?.checked || false,
+        manufacturerDetails: elements.includeManufacturerDetails?.checked || false,
+        obligationCheck: elements.includeObligationCheck?.checked || false,
+        liabilities: elements.includeLiabilities?.checked || false,
+        vatReturns: elements.includeVATReturns?.checked || false,
+        generalLedger: elements.includeGeneralLedger?.checked || false
     };
-
-    const dateRange = getVatDateRange();
-    const downloadPath = elements.downloadPath.value;
-
+    
+    const hasSelected = Object.values(selectedAutomations).some(selected => selected);
+    if (!hasSelected) {
+        await showMessage({
+            type: 'warning',
+            title: 'No Automations Selected',
+            message: 'Please select at least one automation to run.'
+        });
+        return;
+    }
+    
     try {
         appState.isProcessing = true;
         updateUIState();
-        showProgressSection('Running all selected automations...');
-
+        showProgressSection('Running selected automations...');
+        
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+        const dateRange = { type: 'all' }; // Default to all records
+        
         const result = await ipcRenderer.invoke('run-all-automations', {
             company: appState.companyData,
             selectedAutomations,
-            dateRange,
-            downloadPath
+            dateRange: dateRange,
+            downloadPath: downloadPath
         });
-
+        
         if (result.success) {
-            // Update state based on which automations were run
-            if (selectedAutomations.vatReturns) appState.automationResults.vat = true;
-            if (selectedAutomations.generalLedger) appState.automationResults.ledger = true;
             hideProgressSection();
-            showResults(result);
+            await showMessage({
+                type: 'info',
+                title: 'All Automations Complete',
+                message: 'All selected automations completed successfully!'
+            });
         } else {
-            throw new Error(result.error || 'One or more automations failed');
+            throw new Error(result.error || 'Some automations failed');
         }
     } catch (error) {
         console.error('Error running all automations:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Automation Error',
+            message: `Failed to run automations: ${error.message}`
+        });
         hideProgressSection();
-        await showMessage({ type: 'error', title: 'Automation Error', message: `An error occurred: ${error.message}` });
     } finally {
         appState.isProcessing = false;
         updateUIState();
     }
 }
 
-function getVatDateRange() {
-    const selected = document.querySelector('input[name="vatDateRange"]:checked').value;
-    if (selected === 'custom') {
-        return {
-            type: 'custom',
-            startYear: elements.vatStartYear.value,
-            startMonth: elements.vatStartMonth.value,
-            endYear: elements.vatEndYear.value,
-            endMonth: elements.vatEndMonth.value
-        };
+// Configuration functions
+async function selectDownloadFolder() {
+    try {
+        const result = await ipcRenderer.invoke('select-folder');
+        if (result.success && result.folderPath) {
+            elements.downloadPath.value = result.folderPath;
+        }
+    } catch (error) {
+        console.error('Error selecting folder:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to select download folder.'
+        });
     }
-    return { type: selected };
 }
 
-// Helper functions for progress and results
+async function saveConfiguration() {
+    try {
+        const config = {
+            downloadPath: elements.downloadPath?.value || '',
+            outputFormat: elements.outputFormat?.value || 'xlsx'
+        };
+        
+        const result = await ipcRenderer.invoke('save-config', config);
+        if (result.success) {
+            await showMessage({
+                type: 'info',
+                title: 'Configuration Saved',
+                message: 'Configuration saved successfully!'
+            });
+        }
+    } catch (error) {
+        console.error('Error saving configuration:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to save configuration.'
+        });
+    }
+}
+
+async function loadConfiguration() {
+    try {
+        const result = await ipcRenderer.invoke('load-config');
+        if (result.success && result.config) {
+            const config = result.config;
+            if (elements.downloadPath) elements.downloadPath.value = config.downloadPath || '';
+            if (elements.outputFormat) elements.outputFormat.value = config.outputFormat || 'xlsx';
+            
+            await showMessage({
+                type: 'info',
+                title: 'Configuration Loaded',
+                message: 'Configuration loaded successfully!'
+            });
+        }
+    } catch (error) {
+        console.error('Error loading configuration:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to load configuration.'
+        });
+    }
+}
+
+// Utility functions
 function showProgressSection(message) {
     if (elements.progressSection) {
         elements.progressSection.classList.remove('hidden');
     }
-    if (elements.results) {
-        elements.results.classList.add('hidden');
+    if (elements.progressText) {
+        elements.progressText.textContent = message;
     }
     if (elements.progressFill) {
         elements.progressFill.style.width = '0%';
-    }
-    if (elements.progressText) {
-        elements.progressText.textContent = message || 'Processing...';
     }
     if (elements.progressLog) {
         elements.progressLog.innerHTML = '';
@@ -752,148 +1647,26 @@ function hideProgressSection() {
 }
 
 function updateProgress(progress) {
-    if (progress.progress !== undefined && elements.progressFill) {
-        elements.progressFill.style.width = `${progress.progress}%`;
+    if (progress.percentage !== undefined && elements.progressFill) {
+        elements.progressFill.style.width = `${progress.percentage}%`;
     }
     
     if (progress.message && elements.progressText) {
         elements.progressText.textContent = progress.message;
     }
     
-    if (progress.log) {
-        addLogEntry(progress.log, progress.logType || 'info');
-    }
-    
-    if (progress.stage) {
-        addLogEntry(`[${progress.stage}] ${progress.message}`, 'info');
-    }
-}
-
-function addLogEntry(message, type = 'info') {
-    if (!elements.progressLog) return;
-    
-    const logEntry = document.createElement('div');
-    logEntry.className = `log-entry ${type}`;
-    logEntry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
-    elements.progressLog.appendChild(logEntry);
-    elements.progressLog.scrollTop = elements.progressLog.scrollHeight;
-}
-
-function showResults(result) {
-    if (elements.results) {
-        elements.results.classList.remove('hidden');
-    }
-    
-    if (!elements.resultContent) return;
-    
-    if (result.success) {
-        elements.resultContent.innerHTML = `
-            <div class="success-message">
-                <h4>✅ ${result.message}</h4>
-                <p><strong>Download Location:</strong> ${result.downloadPath || 'Default location'}</p>
-                ${result.files && result.files.length > 0 ? `
-                    <p><strong>Generated Files:</strong></p>
-                    <ul>
-                        ${result.files.map(file => `<li>${file}</li>`).join('')}
-                    </ul>
-                ` : ''}
-            </div>
-        `;
-    } else {
-        elements.resultContent.innerHTML = `
-            <div class="error-message">
-                <h4>❌ ${result.message}</h4>
-                ${result.error ? `<p><strong>Error Details:</strong> ${result.error}</p>` : ''}
-            </div>
-        `;
-    }
-}
-
-// Configuration functions
-async function selectDownloadFolder() {
-    const folderPath = await ipcRenderer.invoke('select-download-folder');
-    if (folderPath && elements.downloadPath) {
-        elements.downloadPath.value = folderPath;
-    }
-}
-
-async function saveConfiguration() {
-    const config = {
-        company: appState.companyData,
-        downloadPath: elements.downloadPath?.value,
-        outputFormat: elements.outputFormat?.value
-    };
-    
-    const result = await ipcRenderer.invoke('save-config', config);
-    
-    if (result.success) {
-        await showMessage({
-            type: 'info',
-            title: 'Configuration Saved',
-            message: 'Configuration has been saved successfully.'
-        });
-    } else {
-        await showMessage({
-            type: 'error',
-            title: 'Save Error',
-            message: `Failed to save configuration: ${result.error}`
-        });
-    }
-}
-
-async function loadConfiguration() {
-    const config = await ipcRenderer.invoke('load-config');
-    
-    if (config) {
-        applyConfiguration(config);
-        await showMessage({
-            type: 'info',
-            title: 'Configuration Loaded',
-            message: 'Configuration has been loaded successfully.'
-        });
-    } else {
-        await showMessage({
-            type: 'warning',
-            title: 'No Configuration Found',
-            message: 'No saved configuration found.'
-        });
-    }
-}
-
-function applyConfiguration(config) {
-    if (config.company) {
-        appState.companyData = config.company;
-        if (elements.kraPin) elements.kraPin.value = config.company.pin || '';
-        if (elements.kraPassword) elements.kraPassword.value = config.company.password || '';
-        
-        if (config.company.name) {
-            displayCompanyDetails(config.company);
-            if (elements.companyDetailsResult) {
-                elements.companyDetailsResult.classList.remove('hidden');
-            }
-        }
-    }
-    
-    if (config.downloadPath && elements.downloadPath) {
-        elements.downloadPath.value = config.downloadPath;
-    }
-    
-    if (config.outputFormat && elements.outputFormat) {
-        elements.outputFormat.value = config.outputFormat;
-    }
-    
-    updateUIState();
-}
-
-async function loadSavedConfig() {
-    const config = await ipcRenderer.invoke('load-config');
-    if (config) {
-        applyConfiguration(config);
+    if (progress.log && elements.progressLog) {
+        const logEntry = document.createElement('div');
+        logEntry.textContent = progress.log;
+        elements.progressLog.appendChild(logEntry);
+        elements.progressLog.scrollTop = elements.progressLog.scrollHeight;
     }
 }
 
 async function showMessage(options) {
-    return await ipcRenderer.invoke('show-message', options);
+    // Simple alert for now - can be enhanced with custom modal
+    const icon = options.type === 'error' ? '❌' : options.type === 'warning' ? '⚠️' : 'ℹ️';
+    alert(`${icon} ${options.title}\n\n${options.message}`);
 }
 
 // Initialize the application when DOM is loaded
