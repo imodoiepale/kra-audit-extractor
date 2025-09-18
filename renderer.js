@@ -52,6 +52,10 @@ const elements = {
     runLiabilitiesExtraction: document.getElementById('runLiabilitiesExtraction'),
     liabilitiesResults: document.getElementById('liabilitiesResults'),
     
+    // Step 7: General Ledger
+    runLedgerExtraction: document.getElementById('runLedgerExtraction'),
+    ledgerResults: document.getElementById('ledgerResults'),
+    
     // Step 5: VAT Returns
     vatDateRange: document.getElementsByName('vatDateRange'),
     vatCustomDateInputs: document.getElementById('vatCustomDateInputs'),
@@ -550,44 +554,99 @@ function updateValidationDisplay(result) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -639,44 +698,99 @@ function displayManufacturerDetails(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -685,44 +799,99 @@ function displayObligationResults(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -731,44 +900,99 @@ function displayObligationResults(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -777,44 +1001,99 @@ function displayObligationResults(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -823,44 +1102,99 @@ function displayObligationResults(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -869,44 +1203,99 @@ function displayObligationResults(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -915,44 +1304,99 @@ function displayObligationResults(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -961,44 +1405,99 @@ function displayObligationResults(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -1007,44 +1506,99 @@ function displayObligationResults(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -1053,44 +1607,99 @@ function displayObligationResults(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    const obligations = [
-        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_effective_from, to: data.income_tax_company_effective_to },
-        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_effective_from, to: data.vat_effective_to },
-        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_effective_from, to: data.paye_effective_to },
-        { name: 'Income Tax - Rent Income (MRI)', status: data.rent_income_mri_status, from: data.rent_income_mri_effective_from, to: data.rent_income_mri_effective_to },
-        { name: 'Income Tax - Resident Individual', status: data.resident_individual_status, from: data.resident_individual_effective_from, to: data.resident_individual_effective_to },
-        { name: 'Income Tax - Turnover Tax', status: data.turnover_tax_status, from: data.turnover_tax_effective_from, to: data.turnover_tax_effective_to },
-    ];
+    // Use the enhanced obligation data structure
+    const allObligations = data.obligations || [];
+    const otherObligations = data.other_obligations || [];
 
     let tableHtml = `
-        <h4>Obligation Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Obligation</th>
-                    <th>Status</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h4>Tax Obligation Status</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Total Obligations</span>
+                <span class="summary-value">${allObligations.length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Active Obligations</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Company</span>
+                <span class="summary-value">${data.company_name || 'N/A'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+        </div>
     `;
 
-    obligations.forEach(ob => {
+    if (allObligations.length > 0) {
         tableHtml += `
-            <tr>
-                <td>${ob.name}</td>
-                <td>${ob.status || 'N/A'}</td>
-                <td>${ob.from || 'N/A'}</td>
-                <td>${ob.to || 'N/A'}</td>
-            </tr>
+            <!-- Main Obligations Table -->
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Obligation Name</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-    });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+        allObligations.forEach(obligation => {
+            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
+                               'warning-status';
+            
+            tableHtml += `
+                <tr>
+                    <td>${obligation.name || 'N/A'}</td>
+                    <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
+                    <td>${obligation.effectiveFrom || 'N/A'}</td>
+                    <td>${obligation.effectiveTo || 'Active'}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📋 No tax obligations found for this company.</p>
+            </div>
+        `;
+    }
+
+    // Add backward compatibility section for main obligations
+    const mainObligations = [
+        { name: 'Income Tax - Company', status: data.income_tax_company_status, from: data.income_tax_company_from, to: data.income_tax_company_to },
+        { name: 'Value Added Tax (VAT)', status: data.vat_status, from: data.vat_from, to: data.vat_to },
+        { name: 'Income Tax - PAYE', status: data.paye_status, from: data.paye_from, to: data.paye_to }
+    ].filter(ob => ob.status && ob.status !== 'No obligation');
+
+    if (mainObligations.length > 0) {
+        tableHtml += `
+            <div class="extraction-info">
+                <h5>Key Tax Obligations Summary:</h5>
+                <ul>
+        `;
+        
+        mainObligations.forEach(ob => {
+            tableHtml += `<li><strong>${ob.name}:</strong> ${ob.status} (${ob.from || 'N/A'} - ${ob.to || 'Active'})</li>`;
+        });
+        
+        tableHtml += `
+                </ul>
+            </div>
+        `;
+    }
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');
@@ -1758,9 +2367,93 @@ function displayLiabilitiesResults(result) {
 }
 
 function displayLedgerResults(result) {
-    // For now, show a simple success message since ledger extraction doesn't have a specific results element
-    // You can add a ledgerResults element to the HTML if needed
-    console.log('Ledger extraction completed successfully:', result);
+    if (!elements.ledgerResults) return;
+
+    // Extract data from result if available
+    const ledgerData = result.data || [];
+    const recordCount = ledgerData.length || 0;
+
+    let tableHtml = `
+        <h4>General Ledger Transactions</h4>
+        
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">Records Found</span>
+                <span class="summary-value">${recordCount}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Status</span>
+                <span class="summary-value success-status">✓ Completed</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">File Location</span>
+                <span class="summary-value">📁 Excel Saved</span>
+            </div>
+        </div>
+    `;
+
+    if (recordCount > 0) {
+        tableHtml += `
+            <!-- Detailed Ledger Table -->
+            <div class="table-container">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Sr.No</th>
+                            <th>Tax Obligation</th>
+                            <th>Period</th>
+                            <th>Date</th>
+                            <th>Ref No.</th>
+                            <th>Particulars</th>
+                            <th>Type</th>
+                            <th>Debit</th>
+                            <th>Credit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        ledgerData.forEach(transaction => {
+            const isTotal = transaction.isTotal || (transaction.srNo && transaction.srNo.toLowerCase().includes('total'));
+            const rowClass = isTotal ? 'total-row' : '';
+            
+            tableHtml += `
+                <tr class="${rowClass}">
+                    <td title="${transaction.srNo || ''}">${transaction.srNo || ''}</td>
+                    <td title="${transaction.taxObligation || ''}">${transaction.taxObligation || ''}</td>
+                    <td title="${transaction.taxPeriod || ''}">${transaction.taxPeriod || ''}</td>
+                    <td title="${transaction.transactionDate || ''}">${transaction.transactionDate || ''}</td>
+                    <td title="${transaction.referenceNumber || ''}">${transaction.referenceNumber || ''}</td>
+                    <td title="${transaction.particulars || ''}">${transaction.particulars || ''}</td>
+                    <td title="${transaction.transactionType || ''}">${transaction.transactionType || ''}</td>
+                    <td class="amount-cell" title="${transaction.debit || ''}">${transaction.debit || ''}</td>
+                    <td class="amount-cell" title="${transaction.credit || ''}">${transaction.credit || ''}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } else {
+        tableHtml += `
+            <div class="no-data-message">
+                <p>📊 No ledger transactions found for the selected criteria.</p>
+            </div>
+        `;
+    }
+
+    tableHtml += `
+        <div class="extraction-info">
+            <small>📁 Excel file saved to: ${result.downloadPath || 'Default location'}</small>
+        </div>
+    `;
+
+    elements.ledgerResults.innerHTML = tableHtml;
+    elements.ledgerResults.classList.remove('hidden');
     
     // Update the UI state to show the green checkmark
     updateUIState();

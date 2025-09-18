@@ -1,0 +1,14 @@
+{
+  "watch": [
+    "renderer.js",
+    "styles.css",
+    "main.js",
+    "automations/*.js"
+  ],
+  "ignore": [
+    "node_modules/**/*",
+    "dist/**/*",
+    "*.log"
+  ],
+  "ext": "js,json,css,html"
+}

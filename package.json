@@ -5,7 +5,8 @@
     "main": "main.js",
     "scripts": {
         "start": "electron .",
-        "dev": "electron . --dev",
+        "dev": "nodemon --watch . --exec electron . --dev",
+        "watch": "nodemon --watch . --exec electron .",
         "build": "electron-builder",
         "dist": "electron-builder --publish=never"
     },
@@ -20,7 +21,8 @@
     "license": "MIT",
     "devDependencies": {
         "electron": "^27.3.11",
-        "electron-builder": "^24.13.3"
+        "electron-builder": "^24.13.3",
+        "nodemon": "^3.1.10"
     },
     "dependencies": {
         "exceljs": "^4.4.0",

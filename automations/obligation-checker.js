@@ -109,9 +109,11 @@ async function processCompanyData(company, page, progressCallback) {
 function organizeData(companyName, tableContent) {
     const data = {
         company_name: companyName,
+        obligations: [],
         income_tax_company_status: 'No obligation',
         vat_status: 'No obligation',
         paye_status: 'No obligation',
+        other_obligations: []
     };
 
     if (!tableContent || tableContent === "Table not found") {
@@ -122,16 +124,39 @@ function organizeData(companyName, tableContent) {
 
     lines.forEach(line => {
         const parts = line.split('\t').map(part => part.trim());
-        if (parts.length >= 3) {
-            const [obligationName, status, fromDate, toDate = 'Active'] = parts;
-            if (obligationName.includes('Income Tax - Company')) {
+        if (parts.length >= 2) {
+            const obligationName = parts[0] || 'Unknown';
+            const status = parts[1] || 'Unknown';
+            const effectiveFrom = parts[2] || 'N/A';
+            const effectiveTo = parts[3] || 'Active';
+
+            // Create obligation object with all details
+            const obligation = {
+                name: obligationName,
+                status: status,
+                effectiveFrom: effectiveFrom,
+                effectiveTo: effectiveTo
+            };
+
+            // Add to obligations array
+            data.obligations.push(obligation);
+
+            // Set specific obligation statuses for backward compatibility
+            if (obligationName.toLowerCase().includes('income tax') && obligationName.toLowerCase().includes('company')) {
                 data.income_tax_company_status = status;
-            }
-            if (obligationName.includes('Value Added Tax')) {
+                data.income_tax_company_from = effectiveFrom;
+                data.income_tax_company_to = effectiveTo;
+            } else if (obligationName.toLowerCase().includes('value added tax') || obligationName.toLowerCase().includes('vat')) {
                 data.vat_status = status;
-            }
-            if (obligationName.includes('Income Tax - PAYE')) {
+                data.vat_from = effectiveFrom;
+                data.vat_to = effectiveTo;
+            } else if (obligationName.toLowerCase().includes('paye') || (obligationName.toLowerCase().includes('income tax') && obligationName.toLowerCase().includes('paye'))) {
                 data.paye_status = status;
+                data.paye_from = effectiveFrom;
+                data.paye_to = effectiveTo;
+            } else {
+                // Add to other obligations if it's not one of the main three
+                data.other_obligations.push(obligation);
             }
         }
     });

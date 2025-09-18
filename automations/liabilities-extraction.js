@@ -201,6 +201,7 @@ async function loginToKRA(page, company, downloadFolderPath, progressCallback) {
 
 // Process a single company
 async function processCompany(page, company, downloadFolderPath, progressCallback) {
+    await page.goto("https://itax.kra.go.ke/KRA-Portal/");
     progressCallback({ log: `Processing company: ${company.name}` });
 
     const workbook = new ExcelJS.Workbook();

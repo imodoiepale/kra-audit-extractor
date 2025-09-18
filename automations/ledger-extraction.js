@@ -79,7 +79,8 @@ async function runLedgerExtraction(company, downloadPath, progressCallback) {
             success: true,
             files: [extractedData.fileName],
             downloadPath: ledgerDownloadPath,
-            recordCount: extractedData.recordCount
+            recordCount: extractedData.recordCount,
+            data: extractedData.data
         };
 
     } catch (error) {
@@ -237,6 +238,7 @@ async function extractLedgerData(page, company, downloadPath, progressCallback) 
     worksheet.addRow();
 
     let recordCount = 0;
+    let extractedData = [];
 
     try {
         const ledgerTable = await page.locator("#gridGeneralLedgerDtlsTbl").first();
@@ -268,26 +270,38 @@ async function extractLedgerData(page, company, downloadPath, progressCallback) 
                 ]);
                 highlightCells(headerRow, "D", "L", "FFC0C0C0", true);
 
-                // Add data
+                // Add data and capture for UI display
                 tableContent
                     .filter(row => row.some(cell => cell.trim() !== ""))
                     .forEach(row => {
                         const excelRow = worksheet.addRow(["", "", ...row]);
                         
-                        // Format number columns
-                        if (row.length >= 10) {
-                            const debitCell = excelRow.getCell(11); // Column K
-                            const creditCell = excelRow.getCell(12); // Column L
+                        // Store data for UI display exactly as it appears
+                        extractedData.push({
+                            srNo: row[0] || '',
+                            taxObligation: row[1] || '',
+                            taxPeriod: row[2] || '',
+                            transactionDate: row[3] || '',
+                            referenceNumber: row[4] || '',
+                            particulars: row[5] || '',
+                            transactionType: row[6] || '',
+                            debit: row[7] || '',
+                            credit: row[8] || '',
+                            isTotal: row[0] && row[0].toLowerCase().includes('total')
+                        });
+                        
+                        // Format number columns in Excel if they contain numeric data
+                        if (row.length >= 8) {
+                            const debitCell = excelRow.getCell(10); // Column J
+                            const creditCell = excelRow.getCell(11); // Column K
                             
-                            if (row[9]) {
-                                const debitValue = parseFloat(row[9].replace(/,/g, '')) || 0;
-                                debitCell.value = debitValue;
+                            if (row[7] && row[7] !== '-' && !isNaN(parseFloat(row[7].replace(/,/g, '')))) {
+                                debitCell.value = parseFloat(row[7].replace(/,/g, ''));
                                 debitCell.numFmt = '#,##0.00';
                             }
                             
-                            if (row[10]) {
-                                const creditValue = parseFloat(row[10].replace(/,/g, '')) || 0;
-                                creditCell.value = creditValue;
+                            if (row[8] && row[8] !== '-' && !isNaN(parseFloat(row[8].replace(/,/g, '')))) {
+                                creditCell.value = parseFloat(row[8].replace(/,/g, ''));
                                 creditCell.numFmt = '#,##0.00';
                             }
                         }
@@ -346,7 +360,8 @@ async function extractLedgerData(page, company, downloadPath, progressCallback) 
 
     return {
         fileName: fileName,
-        recordCount: recordCount
+        recordCount: recordCount,
+        data: extractedData
     };
 }
 
