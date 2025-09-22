@@ -74,6 +74,10 @@ async function runVATExtraction(company, dateRange, downloadPath, progressCallba
         browser = await chromium.launch({ headless: false, channel: "chrome" });
         const context = await browser.newContext();
         const page = await context.newPage();
+        
+        // Set timeouts for better reliability
+        page.setDefaultNavigationTimeout(180000);
+        page.setDefaultTimeout(180000);
 
         const loginSuccess = await loginToKRA(page, company, progressCallback);
         if (!loginSuccess) {
@@ -96,7 +100,16 @@ async function runVATExtraction(company, dateRange, downloadPath, progressCallba
             files: [results.filePath],
             downloadPath: vatDownloadPath,
             data: results.data,
-            totalReturns: results.totalReturns
+            totalReturns: results.totalReturns,
+            companyData: results.companyData, // Include detailed company data for UI
+            extractionSummary: {
+                companyName: company.name,
+                kraPin: company.pin,
+                extractionDate: formattedDateTime,
+                dateRange: dateRange,
+                totalReturns: results.totalReturns,
+                sectionsExtracted: Object.keys(results.companyData?.filedReturns?.sections || {})
+            }
         };
 
     } catch (error) {
@@ -126,7 +139,10 @@ async function loginToKRA(page, company, progressCallback) {
     try {
         await page.locator('input[name="xxZTT9p2wQ"]').fill(company.password, { timeout: 2000 });
     } catch (error) {
-        progressCallback({ log: `Could not fill password field for ${company.name}. Skipping this company.` });
+        progressCallback({ 
+            log: `Could not fill password field for ${company.name}. Skipping this company.`,
+            logType: 'error'
+        });
         return false;
     }
 
@@ -215,58 +231,50 @@ async function loginToKRA(page, company, progressCallback) {
 }
 
 async function navigateToVATReturns(page, progressCallback) {
-    const menuItemsSelector = [
-        "#ddtopmenubar > ul > li:nth-child(2) > a",
-        "#ddtopmenubar > ul > li:nth-child(3) > a",
-        "#ddtopmenubar > ul > li:nth-child(4) > a"
-    ];
-
-    let dynamicElementFound = false;
-    for (const selector of menuItemsSelector) {
-        if (dynamicElementFound) break;
+    try {
+        // Wait for the main page to load
+        await page.waitForSelector('#ddtopmenubar > ul > li > a:has-text("Returns")', { timeout: 20000 });
         
-        await page.reload();
-        const menuItem = await page.$(selector);
-        
-        if (menuItem) {
-            const bbox = await menuItem.boundingBox();
-            if (bbox) {
-                const x = bbox.x + bbox.width / 2;
-                const y = bbox.y + bbox.height / 2;
-                await page.mouse.move(x, y);
-                await page.waitForTimeout(1000);
-                
-                dynamicElementFound = await page.waitForSelector("#Returns > li:nth-child(3)", { timeout: 1000 })
-                    .then(() => true).catch(() => false);
-            }
-        }
+        // Hover over Returns menu to activate dropdown
+        await page.hover('#ddtopmenubar > ul > li > a:has-text("Returns")');
+        await page.waitForTimeout(1000);
+
+        // Click on "View E-Returns" using the function call
+        await page.evaluate(() => {
+            viewEReturns();
+        });
+
+        await page.waitForTimeout(2000);
+
+        // Select VAT from dropdown
+        await page.locator("#taxType").selectOption("Value Added Tax (VAT)");
+        await page.click(".submit");
+
+        // Handle first dialog
+        page.once("dialog", dialog => {
+            dialog.accept().catch(() => {});
+        });
+        await page.click(".submit");
+
+        // Handle second dialog
+        page.once("dialog", dialog => {
+            dialog.accept().catch(() => {});
+        });
+
+        // Wait for VAT returns page to load
+        await page.waitForTimeout(3000);
+
+        progressCallback({
+            log: 'VAT returns page loaded successfully'
+        });
+
+    } catch (error) {
+        progressCallback({
+            log: `Error navigating to VAT returns: ${error.message}`,
+            logType: 'error'
+        });
+        throw error;
     }
-
-    if (!dynamicElementFound) {
-        throw new Error("Could not find VAT returns menu");
-    }
-
-    await page.waitForSelector("#Returns > li:nth-child(3)");
-    await page.evaluate(() => {
-        viewEReturns();
-    });
-
-    await page.locator("#taxType").selectOption("Value Added Tax (VAT)");
-    await page.click(".submit");
-
-    // Handle dialogs
-    page.once("dialog", dialog => {
-        dialog.accept().catch(() => {});
-    });
-    await page.click(".submit");
-
-    page.once("dialog", dialog => {
-        dialog.accept().catch(() => {});
-    });
-
-    progressCallback({
-        log: 'VAT returns page loaded successfully'
-    });
 }
 
 async function extractVATData(page, company, dateRange, downloadPath, progressCallback) {
@@ -386,6 +394,27 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("FILED RETURNS ALL MONTHS");
 
+    // Initialize company data structure (similar to SALES & PURCHASE.js)
+    const companyData = {
+        companyName: company.name,
+        kraPin: company.pin,
+        extractionDate: formattedDateTime,
+        filedReturns: {
+            summary: [],
+            sections: {
+                sectionB: [],
+                sectionB2: [],
+                sectionE: [],
+                sectionF: [],
+                sectionF2: [],
+                sectionK3: [],
+                sectionM: [],
+                sectionN: [],
+                sectionO: []
+            }
+        }
+    };
+
     // Sheet Header
     const sheetHeader = worksheet.addRow(["", "", "", "", "", `VAT FILED RETURNS ALL MONTHS SUMMARY`]);
     highlightCells(sheetHeader, "B", "M", "83EBFF", true);
@@ -394,7 +423,7 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
     // Navigate to VAT returns
     await navigateToVATReturns(page, progressCallback);
 
-    // Determine date range
+    // Determine date range - improved logic from SALES & PURCHASE.js
     let startYear, startMonth, endYear, endMonth;
     
     if (dateRange && dateRange.type === 'custom') {
@@ -402,17 +431,27 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
         startMonth = dateRange.startMonth || 1;
         endYear = dateRange.endYear || new Date().getFullYear();
         endMonth = dateRange.endMonth || 12;
+    } else if (dateRange && dateRange.type === 'range') {
+        // Handle UI date range format
+        startYear = dateRange.startYear || 2015;
+        startMonth = dateRange.startMonth || 1;
+        endYear = dateRange.endYear || new Date().getFullYear();
+        endMonth = dateRange.endMonth || 12;
     } else {
-        // Default to all available data
+        // Default to current year range
+        const currentDate = new Date();
         startYear = 2015;
         startMonth = 1;
-        endYear = 2025;
+        endYear = currentDate.getFullYear();
         endMonth = 12;
     }
 
     progressCallback({
         log: `Looking for returns between ${startMonth}/${startYear} and ${endMonth}/${endYear}`
     });
+
+    // Extract main returns table data first
+    await extractMainReturnsData(page, companyData, progressCallback);
 
     // Wait for the returns table to load
     await page.waitForSelector('table.tab3:has-text("Sr.No")', { timeout: 10000 });
@@ -424,6 +463,7 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
     let companyNameRowAdded = false;
     let extractedData = [];
 
+    // Process each return with detailed extraction (like SALES & PURCHASE.js)
     for (let i = 1; i < returnRows.length; i++) { // Start from 1 to skip header row
         const row = returnRows[i];
 
@@ -460,14 +500,76 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
             const parsedDate = parseDate(cleanDate);
             const month = parsedDate.getMonth() + 1; // Convert back to 1-based month
             const year = parsedDate.getFullYear();
+            const periodKey = `${getMonthName(month)} ${year}`;
 
             const monthYearRow = worksheet.addRow(["", "", `${getMonthName(month)} ${year}`]);
             highlightCells(monthYearRow, "C", "M", "FF5DFFC9", true);
 
-            // Add basic return info
-            const returnInfoRow = worksheet.addRow([
-                "", "", "", "", `Return processed for ${cleanDate}`, "Data extracted successfully"
-            ]);
+            // Extract detailed data from the return (like SALES & PURCHASE.js)
+            const viewLinkCell = await row.$('td:nth-child(11) a');
+            if (viewLinkCell) {
+                try {
+                    await viewLinkCell.click();
+                    const page2Promise = await page.waitForEvent("popup");
+                    const page2 = await page2Promise;
+                    await page2.waitForLoadState("load");
+
+                    // Check for nil return
+                    const nilReturnCount = await page2.locator('text=DETAILS OF OTHER SECTIONS ARE NOT AVAILABLE AS THE RETURN YOU ARE TRYING TO VIEW IS A NIL RETURN').count();
+
+                    if (nilReturnCount > 0) {
+                        progressCallback({ log: `${periodKey} is a NIL RETURN - skipping detailed extraction` });
+
+                        // Add nil return data
+                        const nilReturnData = {
+                            period: periodKey,
+                            date: cleanDate,
+                            month: month,
+                            year: year,
+                            type: "NIL_RETURN",
+                            message: "No data available - NIL RETURN"
+                        };
+
+                        // Add to all sections
+                        Object.keys(companyData.filedReturns.sections).forEach(sectionKey => {
+                            companyData.filedReturns.sections[sectionKey].push({
+                                ...nilReturnData,
+                                section: sectionKey
+                            });
+                        });
+
+                        // Add basic return info to worksheet
+                        const returnInfoRow = worksheet.addRow([
+                            "", "", "", "", `NIL Return for ${cleanDate}`, "No data - NIL return"
+                        ]);
+                    } else {
+                        // Extract detailed section data
+                        await extractDetailedSectionData(page2, companyData, month, year, cleanDate, progressCallback);
+
+                        // Add detailed return info to worksheet
+                        const returnInfoRow = worksheet.addRow([
+                            "", "", "", "", `Detailed data extracted for ${cleanDate}`, "All sections processed"
+                        ]);
+                    }
+
+                    await page2.close();
+                } catch (detailError) {
+                    progressCallback({
+                        log: `Error extracting detailed data for ${cleanDate}: ${detailError.message}`,
+                        logType: 'warning'
+                    });
+                    
+                    // Add basic return info even if detailed extraction fails
+                    const returnInfoRow = worksheet.addRow([
+                        "", "", "", "", `Basic data for ${cleanDate}`, "Detailed extraction failed"
+                    ]);
+                }
+            } else {
+                // Add basic return info if no view link
+                const returnInfoRow = worksheet.addRow([
+                    "", "", "", "", `Return processed for ${cleanDate}`, "No view link available"
+                ]);
+            }
 
             // Store extracted data
             extractedData.push({
@@ -516,6 +618,20 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
         ]);
         highlightCells(noDataRow, "C", "M", "FFFF9999", true);
         worksheet.addRow();
+
+        // Add no data message to company structure
+        const noDataMessage = {
+            period: `${startMonth}/${startYear} to ${endMonth}/${endYear}`,
+            type: "NO_DATA",
+            message: "No returns found for specified period"
+        };
+
+        Object.keys(companyData.filedReturns.sections).forEach(sectionKey => {
+            companyData.filedReturns.sections[sectionKey].push({
+                ...noDataMessage,
+                section: sectionKey
+            });
+        });
     }
 
     // Auto-fit columns
@@ -535,11 +651,277 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
     const filePath = path.join(downloadPath, `AUTO-FILED-RETURNS-SUMMARY-KRA.xlsx`);
     await workbook.xlsx.writeFile(filePath);
 
+    // Save detailed data to JSON
+    const jsonFilePath = await saveVATDataToJSON(companyData, downloadPath, progressCallback);
+
+    // Log extraction completion
+    progressCallback({
+        log: `VAT data extraction completed for ${company.name}`
+    });
+
     return {
         filePath,
         data: extractedData,
-        totalReturns: processedCount
+        totalReturns: processedCount,
+        companyData: companyData // Include detailed company data
     };
+}
+
+// Function to save extracted data to JSON file
+async function saveVATDataToJSON(companyData, downloadPath, progressCallback) {
+    try {
+        progressCallback({
+            log: `Saving VAT data to JSON for ${companyData.companyName}...`
+        });
+
+        const jsonData = {
+            extractionDate: formattedDateTime,
+            company: companyData
+        };
+
+        const jsonFileName = `VAT_Data_${companyData.kraPin}_${formattedDateTime.replace(/\./g, '-')}.json`;
+        const jsonFilePath = path.join(downloadPath, jsonFileName);
+        
+        await fs.writeFile(jsonFilePath, JSON.stringify(jsonData, null, 2), 'utf8');
+        
+        progressCallback({
+            log: `✅ VAT data saved to JSON: ${jsonFileName}`
+        });
+        
+        return jsonFilePath;
+    } catch (error) {
+        progressCallback({
+            log: `Error saving VAT data to JSON: ${error.message}`,
+            logType: 'error'
+        });
+        return null;
+    }
+}
+
+async function extractMainReturnsData(page, companyData, progressCallback) {
+    try {
+        const returnsTableLocator = await page.locator('table.tab3:has-text("Sr.No")');
+
+        if (returnsTableLocator) {
+            const returnsTable = await returnsTableLocator.first();
+
+            if (returnsTable) {
+                const tableContent = await returnsTable.evaluate(table => {
+                    const rows = Array.from(table.querySelectorAll("tr"));
+                    return rows.map(row => {
+                        const cells = Array.from(row.querySelectorAll("td"));
+                        return cells.map(cell => cell.innerText.trim());
+                    });
+                });
+
+                // Convert table content to structured data
+                const headers = tableContent[0] || [];
+                const dataRows = tableContent.slice(1);
+
+                companyData.filedReturns.summary = dataRows.map(row => {
+                    const rowData = {};
+                    headers.forEach((header, index) => {
+                        rowData[header] = row[index] || '';
+                    });
+                    return rowData;
+                });
+
+                progressCallback({
+                    log: `Extracted main returns table with ${dataRows.length} records`
+                });
+
+            } else {
+                progressCallback({
+                    log: `${companyData.companyName}: Returns table not found.`,
+                    logType: 'warning'
+                });
+                companyData.filedReturns.summary = [{ error: "Returns table not found" }];
+            }
+        } else {
+            progressCallback({
+                log: `${companyData.companyName}: Returns table locator not found.`,
+                logType: 'warning'
+            });
+            companyData.filedReturns.summary = [{ error: "Returns table locator not found" }];
+        }
+    } catch (error) {
+        progressCallback({
+            log: `Error extracting main returns data for ${companyData.companyName}: ${error.message}`,
+            logType: 'error'
+        });
+        companyData.filedReturns.summary = [{ error: error.message }];
+    }
+}
+
+async function extractDetailedSectionData(page2, companyData, month, year, cleanDate, progressCallback) {
+    const periodKey = `${getMonthName(month)} ${year}`;
+
+    // Configure page for data extraction (from SALES & PURCHASE.js)
+    await page2.evaluate(() => {
+        const changeSelectOptions = () => {
+            const selectElements = document.querySelectorAll(".ui-pg-selbox");
+            selectElements.forEach(selectElement => {
+                Array.from(selectElement.options).forEach(option => {
+                    if (option.text === "20") {
+                        option.value = "20000";
+                    }
+                });
+            });
+        };
+        changeSelectOptions();
+    });
+
+    const selectElements = await page2.$$(".ui-pg-selbox");
+    for (const selectElement of selectElements) {
+        try {
+            await selectElement.click();
+            await page2.keyboard.press("ArrowDown");
+            await page2.keyboard.press("Enter");
+        } catch (error) {
+            // Continue if select element interaction fails
+        }
+    }
+
+    try {
+        await page2.locator("#pagersch5Tbl_center > table > tbody > tr > td:nth-child(8) > select").selectOption("20");
+    } catch (error) {
+        // Continue if this specific selector fails
+    }
+
+    // Section definitions with their selectors (from SALES & PURCHASE.js)
+    const sections = {
+        sectionF: {
+            selector: "#gview_gridsch5Tbl",
+            name: "Section F - Purchases and Input Tax",
+            headers: ["Type of Purchases", "PIN of Supplier", "Name of Supplier", "Invoice Date", "Invoice Number", "Description of Goods / Services", "Custom Entry Number", "Taxable Value (Ksh)", "Amount of VAT (Ksh)", "Relevant Invoice Number", "Relevant Invoice Date"]
+        },
+        sectionB: {
+            selector: "#gridGeneralRateSalesDtlsTbl",
+            name: "Section B - Sales and Output Tax",
+            headers: ["PIN of Purchaser", "Name of Purchaser", "ETR Serial Number", "Invoice Date", "Invoice Number", "Description of Goods / Services", "Taxable Value (Ksh)", "Amount of VAT (Ksh)", "Relevant Invoice Number", "Relevant Invoice Date"]
+        },
+        sectionB2: {
+            selector: "#GeneralRateSalesDtlsTbl",
+            name: "Section B2 - Sales Totals",
+            headers: ["Description", "Taxable Value (Ksh)", "Amount of VAT (Ksh)"]
+        },
+        sectionE: {
+            selector: "#gridSch4Tbl",
+            name: "Section E - Sales Exempt",
+            headers: ["PIN of Purchaser", "Name of Purchaser", "ETR Serial Number", "Invoice Date", "Invoice Number", "Description of Goods / Services", "Sales Value (Ksh)"]
+        },
+        sectionF2: {
+            selector: "#sch5Tbl",
+            name: "Section F2 - Purchases Totals",
+            headers: ["Description", "Taxable Value (Ksh)", "Amount of VAT (Ksh)"]
+        },
+        sectionK3: {
+            selector: "#gridVoucherDtlTbl",
+            name: "Section K3 - Credit Adjustment Voucher",
+            headers: ["Credit Adjustment Voucher Number", "Date of Voucher", "Amount"]
+        },
+        sectionM: {
+            selector: "#viewReturnVat > table > tbody > tr:nth-child(7) > td > table:nth-child(3)",
+            name: "Section M - Sales Summary",
+            headers: ["Sr.No.", "Details of Sales", "Amount (Excl. VAT) (Ksh)", "Rate (%)", "Amount of Output VAT (Ksh)"]
+        },
+        sectionN: {
+            selector: "#viewReturnVat > table > tbody > tr:nth-child(7) > td > table:nth-child(5)",
+            name: "Section N - Purchases Summary",
+            headers: ["Sr.No.", "Details of Purchases", "Amount (Excl. VAT) (Ksh)", "Rate (%)", "Amount of Input VAT (Ksh)"]
+        },
+        sectionO: {
+            selector: "#viewReturnVat > table > tbody > tr:nth-child(8) > td > table.panelGrid.tablerowhead",
+            name: "Section O - Tax Calculation",
+            headers: ["Sr.No.", "Descriptions", "Amount (Ksh)"]
+        }
+    };
+
+    for (const [sectionKey, sectionConfig] of Object.entries(sections)) {
+        try {
+            const tableLocator = await page2.waitForSelector(sectionConfig.selector, { timeout: 2000 }).catch(() => null);
+
+            const sectionData = {
+                period: periodKey,
+                date: cleanDate,
+                month: month,
+                year: year,
+                section: sectionConfig.name,
+                data: [],
+                status: "success"
+            };
+
+            if (tableLocator) {
+                const tableContent = await tableLocator.evaluate(table => {
+                    const rows = Array.from(table.querySelectorAll("tr"));
+                    return rows.map(row => {
+                        const cells = Array.from(row.querySelectorAll("td"));
+                        return cells.map(cell => cell.innerText.trim());
+                    });
+                });
+
+                if (tableContent.length <= 1) {
+                    sectionData.status = "no_records";
+                    sectionData.message = "No records found";
+                } else {
+                    // Convert table data to structured format
+                    const dataRows = tableContent.filter(row => row.some(cell => cell.trim() !== ""));
+
+                    sectionData.data = dataRows.map(row => {
+                        const rowData = {};
+                        sectionConfig.headers.forEach((header, index) => {
+                            let value = row[index] || '';
+
+                            // Handle numeric values
+                            if (header.includes('Ksh') || header.includes('Amount') || header.includes('Value')) {
+                                const numericValue = value.replace(/,/g, '');
+                                if (!isNaN(numericValue) && numericValue !== '') {
+                                    value = Number(numericValue);
+                                }
+                            }
+
+                            rowData[header] = value;
+                        });
+                        return rowData;
+                    });
+                }
+
+                progressCallback({
+                    log: `Extracted ${sectionConfig.name} - ${sectionData.data.length} records`
+                });
+
+            } else {
+                sectionData.status = "not_found";
+                sectionData.message = `${sectionConfig.name} table not found`;
+
+                progressCallback({
+                    log: `${sectionConfig.name} not found for ${periodKey}`,
+                    logType: 'warning'
+                });
+            }
+
+            // Add to company data
+            companyData.filedReturns.sections[sectionKey].push(sectionData);
+
+        } catch (error) {
+            const errorData = {
+                period: periodKey,
+                date: cleanDate,
+                month: month,
+                year: year,
+                section: sectionConfig.name,
+                status: "error",
+                error: error.message
+            };
+
+            companyData.filedReturns.sections[sectionKey].push(errorData);
+
+            progressCallback({
+                log: `Error extracting ${sectionConfig.name} for ${periodKey}: ${error.message}`,
+                logType: 'error'
+            });
+        }
+    }
 }
 
 async function createVATSummaryReport(extractedData, company, downloadPath) {

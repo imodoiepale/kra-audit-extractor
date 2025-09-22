@@ -10,7 +10,7 @@ const now = new Date();
 const formattedDateTime = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
 let hours = now.getHours();
 const ampm = hours < 12 ? 'AM' : 'PM';
-hours = hours % 12 || 12; // Convert to 12-hour format
+hours = hours > 12 ? hours - 12 : hours;
 const formattedDateTime2 = `${now.getDate()}.${(now.getMonth() + 1)}.${now.getFullYear()} ${hours}_${now.getMinutes()} ${ampm}`;
 
 // Utility functions for Excel formatting
@@ -40,6 +40,14 @@ function applyBorders(row, startCol, endCol, style = "thin") {
     }
 }
 
+function formatCurrencyCells(row, startCol, endCol) {
+    for (let col = startCol.charCodeAt(0); col <= endCol.charCodeAt(0); col++) {
+        const cell = row.getCell(String.fromCharCode(col));
+        cell.numFmt = '#,##0.00';
+        cell.alignment = { horizontal: 'right' };
+    }
+}
+
 function autoFitColumns(worksheet) {
     worksheet.columns.forEach(column => {
         let maxLength = 0;
@@ -49,16 +57,8 @@ function autoFitColumns(worksheet) {
                 maxLength = cellLength;
             }
         });
-        column.width = Math.min(50, Math.max(12, maxLength + 2)); // Set a minimum width
+        column.width = Math.min(50, Math.max(10, maxLength + 2));
     });
-}
-
-function formatCurrencyCells(row, startCol, endCol) {
-    for (let col = startCol.charCodeAt(0); col <= endCol.charCodeAt(0); col++) {
-        const cell = row.getCell(String.fromCharCode(col));
-        cell.numFmt = '#,##0.00';
-        cell.alignment = { horizontal: 'right' };
-    }
 }
 
 // Function to check if an option exists in a select element
@@ -73,17 +73,17 @@ async function optionExists(locator, value) {
     return false;
 }
 
-// Enhanced function to run both liabilities extraction methods
-async function runLiabilitiesExtraction(company, downloadPath, progressCallback) {
+// Main function to run enhanced liabilities extraction
+async function runEnhancedLiabilitiesExtraction(company, downloadPath, progressCallback) {
     // Create a company-specific subfolder within the user-selected download path
     const safeCompanyName = company.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const subfolderName = `${safeCompanyName}_${company.pin}`;
+    const subfolderName = `${safeCompanyName}_${company.pin}_enhanced`;
     const downloadFolderPath = path.join(downloadPath, subfolderName);
     await fs.mkdir(downloadFolderPath, { recursive: true });
 
     progressCallback({ 
-        stage: 'Liabilities', 
-        message: 'Starting enhanced liabilities extraction (both methods)...', 
+        stage: 'Enhanced Liabilities', 
+        message: 'Starting enhanced liabilities extraction...', 
         progress: 5 
     });
 
@@ -100,40 +100,24 @@ async function runLiabilitiesExtraction(company, downloadPath, progressCallback)
             throw new Error('Login failed. Please check credentials and try again.');
         }
 
-        // Run both methods
-        progressCallback({ 
-            stage: 'Liabilities', 
-            message: 'Running Method 1: VAT Refund approach...', 
-            progress: 30 
-        });
+        // Run both methods and combine results
         const method1Results = await runMethod1_VATRefund(page, company, downloadFolderPath, progressCallback);
-        
-        progressCallback({ 
-            stage: 'Liabilities', 
-            message: 'Running Method 2: Payment Registration approach...', 
-            progress: 60 
-        });
         const method2Results = await runMethod2_PaymentRegistration(page, company, downloadFolderPath, progressCallback);
 
-        // Combine results
-        progressCallback({ 
-            stage: 'Liabilities', 
-            message: 'Combining results from both methods...', 
-            progress: 90 
-        });
-        const combinedResults = await combineMethodResults(method1Results, method2Results, company, downloadFolderPath, progressCallback);
+        // Combine results from both methods
+        const combinedResults = await combineResults(method1Results, method2Results, company, downloadFolderPath, progressCallback);
 
         await browser.close();
 
         progressCallback({ 
-            stage: 'Liabilities', 
+            stage: 'Enhanced Liabilities', 
             message: 'Enhanced liabilities extraction completed successfully.', 
             progress: 100 
         });
-        
+
         return { 
             success: true, 
-            message: 'Liabilities extracted successfully using both methods.', 
+            message: 'Enhanced liabilities extracted successfully using both methods.', 
             files: combinedResults.files, 
             downloadPath: downloadFolderPath,
             data: combinedResults.data,
@@ -149,9 +133,9 @@ async function runLiabilitiesExtraction(company, downloadPath, progressCallback)
         if (browser) {
             await browser.close();
         }
-        console.error('Error during liabilities extraction:', error);
+        console.error('Error during enhanced liabilities extraction:', error);
         progressCallback({ 
-            stage: 'Liabilities', 
+            stage: 'Enhanced Liabilities', 
             message: `Error: ${error.message}`, 
             logType: 'error' 
         });
@@ -187,8 +171,6 @@ async function loginToKRA(page, company, downloadFolderPath, progressCallback) {
 
     const extractResult = async () => {
         const ret = await worker.recognize(imagePath);
-        
-        // Use the same proven method as password validation and obligation checker
         const text1 = ret.data.text.slice(0, -1);
         const text = text1.slice(0, -1);
         const numbers = text.match(/\d+/g);
@@ -226,11 +208,9 @@ async function loginToKRA(page, company, downloadFolderPath, progressCallback) {
 
     await page.type("#captcahText", result.toString());
     await page.click("#loginButton");
-    
-    // Wait a bit for the page to process
     await page.waitForTimeout(2000);
 
-    // Check if login was successful (look for main menu)
+    // Check if login was successful
     const mainMenu = await page.waitForSelector("#ddtopmenubar > ul > li:nth-child(1) > a", { 
         timeout: 5000, 
         state: "visible" 
@@ -238,10 +218,10 @@ async function loginToKRA(page, company, downloadFolderPath, progressCallback) {
 
     if (mainMenu) {
         progressCallback({ log: 'Login successful!' });
+        await page.goto("https://itax.kra.go.ke/KRA-Portal/");
         return true;
     }
 
-    // Check if there's an invalid login message
     const isInvalidLogin = await page.waitForSelector('b:has-text("Wrong result of the arithmetic operation.")', { 
         state: 'visible', 
         timeout: 3000 
@@ -252,155 +232,13 @@ async function loginToKRA(page, company, downloadFolderPath, progressCallback) {
         return loginToKRA(page, company, downloadFolderPath, progressCallback);
     }
 
-    // If no main menu and no invalid login message, something else went wrong
     progressCallback({ log: 'Login failed - unknown error, retrying...' });
     return loginToKRA(page, company, downloadFolderPath, progressCallback);
 }
 
-// Process a single company
-async function processCompany(page, company, downloadFolderPath, progressCallback) {
-    await page.goto("https://itax.kra.go.ke/KRA-Portal/");
-    progressCallback({ log: `Processing company: ${company.name}` });
-
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(`LIABILITIES-${formattedDateTime}`);
-
-    // Add title row
-    const titleRow = worksheet.addRow(["", "KRA LIABILITIES EXTRACTION REPORT", "", `Extraction Date: ${formattedDateTime}`]);
-    worksheet.mergeCells('B1:C1');
-    titleRow.getCell('B').font = { size: 14, bold: true };
-    titleRow.getCell('B').alignment = { horizontal: 'center' };
-    highlightCells(titleRow, "B", "F", "FF87CEEB", true);
-    applyBorders(titleRow, "B", "F", "thin");
-    worksheet.addRow();
-
-    // Add company info row
-    const companyNameRow = worksheet.addRow(["1", company.name, `Extraction Date: ${formattedDateTime}`]);
-    worksheet.mergeCells(`C${companyNameRow.number}:J${companyNameRow.number}`);
-    highlightCells(companyNameRow, "B", "F", "FFADD8E6", true);
-    applyBorders(companyNameRow, "A", "F", "thin");
-
-    if (!company.pin || !(company.pin.startsWith("P") || company.pin.startsWith("A"))) {
-        progressCallback({ log: `Skipping ${company.name}: Invalid KRA PIN` });
-        addNoDataRow(worksheet, "Invalid or Missing KRA PIN");
-        worksheet.addRow([]);
-        const filePath = path.join(downloadFolderPath, `AUTO-EXTRACT-LIABILITIES-${formattedDateTime}.xlsx`);
-        await workbook.xlsx.writeFile(filePath);
-        return { filePath };
-    }
-
-    progressCallback({ log: 'Navigating to VAT Refund section...' });
-    await page.hover("#ddtopmenubar > ul > li:nth-child(6) > a");
-    await page.evaluate(() => { showVATRefund(); });
-    await page.waitForTimeout(3000);
-
-    // Extract data from the specific table with id="3"
-    const liabilitiesTable = await page.waitForSelector("table#\\33", { state: "visible", timeout: 5000 }).catch(() => null);
-
-    addSectionHeader(worksheet, "Outstanding Liabilities", !!liabilitiesTable);
-
-    let extractedData = [];
-    let totalAmount = 0;
-
-    if (liabilitiesTable) {
-        progressCallback({ log: 'Extracting liabilities data from table...' });
-        
-        const headers = await liabilitiesTable.evaluate(table =>
-            Array.from(table.querySelectorAll("thead th")).map(th => th.innerText.trim())
-        );
-
-        const headersRow = worksheet.addRow(["", "", ...headers]);
-        highlightCells(headersRow, "C", "F", "FFD3D3D3", true);
-        applyBorders(headersRow, "C", "F", "thin");
-
-        const tableContent = await liabilitiesTable.evaluate(table =>
-            Array.from(table.querySelectorAll("tbody tr")).map(row =>
-                Array.from(row.querySelectorAll("td")).map(cell => cell.innerText.trim())
-            )
-        );
-
-        tableContent.forEach(rowData => {
-            const excelRow = worksheet.addRow(["", "", ...rowData]);
-            applyBorders(excelRow, "C", "F", "thin");
-
-            const amountText = rowData[3] || '0';
-            const amountValue = parseFloat(amountText.replace(/,/g, ''));
-            if (!isNaN(amountValue)) {
-                totalAmount += amountValue;
-            }
-
-            // Store extracted data for UI display
-            extractedData.push({
-                taxType: rowData[0] || 'N/A',
-                period: rowData[1] || 'N/A',
-                dueDate: rowData[2] || 'N/A',
-                amount: amountValue || 0,
-                status: 'Outstanding'
-            });
-
-            const amountCell = excelRow.getCell('F');
-            amountCell.numFmt = '#,##0.00';
-            amountCell.alignment = { horizontal: 'right' };
-        });
-
-        const totalRow = worksheet.addRow(["", "", "TOTAL", "", "", totalAmount]);
-        highlightCells(totalRow, "C", "F", "FFE4EE99", true);
-        applyBorders(totalRow, "C", "F", "thin");
-
-        const totalAmountCell = totalRow.getCell('F');
-        totalAmountCell.numFmt = '#,##0.00';
-        totalAmountCell.font = { bold: true };
-        totalAmountCell.alignment = { horizontal: 'right' };
-
-        progressCallback({ log: `Extracted ${tableContent.length} liability records with total amount: KES ${totalAmount.toLocaleString()}` });
-    } else {
-        addNoDataRow(worksheet, "No outstanding liabilities records found.");
-        progressCallback({ log: 'No liabilities table found on the page' });
-    }
-
-    worksheet.addRow([]);
-
-    // Auto-fit columns and save file
-    autoFitColumns(worksheet);
-    const filePath = path.join(downloadFolderPath, `AUTO-EXTRACT-LIABILITIES-${formattedDateTime}.xlsx`);
-    await workbook.xlsx.writeFile(filePath);
-    
-    progressCallback({ log: `Excel file saved: ${filePath}` });
-    
-    // Logout
-    await page.evaluate(() => { logOutUser(); });
-    await page.waitForLoadState("load");
-    
-    return { 
-        filePath,
-        data: extractedData,
-        totalAmount: totalAmount,
-        recordCount: extractedData.length
-    };
-}
-
-// Helper functions for Excel formatting
-function addSectionHeader(worksheet, sectionTitle, isSuccess = true) {
-    const headerRow = worksheet.addRow(["", "", sectionTitle]);
-    worksheet.mergeCells(`C${headerRow.number}:J${headerRow.number}`);
-    const bgColor = isSuccess ? "FF90EE90" : "FFFF7474"; // Green for success, Red for failure
-    highlightCells(headerRow, "C", "F", bgColor, true);
-    applyBorders(headerRow, "C", "F", "thin");
-    headerRow.getCell('C').alignment = { horizontal: 'left', vertical: 'middle' };
-    headerRow.height = 20;
-}
-
-function addNoDataRow(worksheet, message) {
-    const noDataRow = worksheet.addRow(["", "", message]);
-    worksheet.mergeCells(`C${noDataRow.number}:J${noDataRow.number}`);
-    highlightCells(noDataRow, "C", "F", "FFFFF2F2");
-    applyBorders(noDataRow, "C", "F", "thin");
-    noDataRow.getCell('C').alignment = { horizontal: 'left', vertical: 'middle' };
-}
-
 // Method 1: VAT Refund approach (existing method)
 async function runMethod1_VATRefund(page, company, downloadFolderPath, progressCallback) {
-    progressCallback({ log: 'Method 1: VAT Refund approach...' });
+    progressCallback({ log: 'Running Method 1: VAT Refund approach...' });
     
     await page.goto("https://itax.kra.go.ke/KRA-Portal/");
     await page.waitForTimeout(2000);
@@ -411,6 +249,7 @@ async function runMethod1_VATRefund(page, company, downloadFolderPath, progressC
         await page.evaluate(() => { showVATRefund(); });
         await page.waitForTimeout(3000);
 
+        // Extract data from the specific table with id="3"
         const liabilitiesTable = await page.waitForSelector("table#\\33", { state: "visible", timeout: 5000 }).catch(() => null);
 
         let extractedData = [];
@@ -478,9 +317,9 @@ async function runMethod1_VATRefund(page, company, downloadFolderPath, progressC
     }
 }
 
-// Method 2: Payment Registration approach
+// Method 2: Payment Registration approach (new method from your code)
 async function runMethod2_PaymentRegistration(page, company, downloadFolderPath, progressCallback) {
-    progressCallback({ log: 'Method 2: Payment Registration approach...' });
+    progressCallback({ log: 'Running Method 2: Payment Registration approach...' });
     
     await page.goto("https://itax.kra.go.ke/KRA-Portal/");
     await page.waitForTimeout(2000);
@@ -499,17 +338,17 @@ async function runMethod2_PaymentRegistration(page, company, downloadFolderPath,
         page.once("dialog", dialog => { dialog.accept().catch(() => { }); });
 
         // Process Income Tax - Company
-        const itResults = await processPaymentRegistrationTax(page, company, "IT", "4", "Income Tax - Company", downloadFolderPath, progressCallback);
+        const itResults = await processPaymentRegistrationTax(page, company, "IT", "4", "Income Tax - Company", progressCallback);
         allExtractedData = allExtractedData.concat(itResults.data);
         totalAmount += itResults.totalAmount;
 
         // Process VAT
-        const vatResults = await processPaymentRegistrationTax(page, company, "VAT", "9", "VAT", downloadFolderPath, progressCallback);
+        const vatResults = await processPaymentRegistrationTax(page, company, "VAT", "9", "VAT", progressCallback);
         allExtractedData = allExtractedData.concat(vatResults.data);
         totalAmount += vatResults.totalAmount;
 
         // Process PAYE
-        const payeResults = await processPaymentRegistrationTax(page, company, "IT", "7", "PAYE", downloadFolderPath, progressCallback);
+        const payeResults = await processPaymentRegistrationTax(page, company, "IT", "7", "PAYE", progressCallback);
         allExtractedData = allExtractedData.concat(payeResults.data);
         totalAmount += payeResults.totalAmount;
 
@@ -547,7 +386,7 @@ async function runMethod2_PaymentRegistration(page, company, downloadFolderPath,
 }
 
 // Helper function to process each tax type in Payment Registration
-async function processPaymentRegistrationTax(page, company, taxHead, taxSubHead, taxName, downloadFolderPath, progressCallback) {
+async function processPaymentRegistrationTax(page, company, taxHead, taxSubHead, taxName, progressCallback) {
     let extractedData = [];
     let totalAmount = 0;
 
@@ -655,7 +494,7 @@ async function processPaymentRegistrationTax(page, company, taxHead, taxSubHead,
 }
 
 // Combine results from both methods
-async function combineMethodResults(method1Results, method2Results, company, downloadFolderPath, progressCallback) {
+async function combineResults(method1Results, method2Results, company, downloadFolderPath, progressCallback) {
     progressCallback({ log: 'Combining results from both methods...' });
 
     const workbook = new ExcelJS.Workbook();
@@ -783,4 +622,23 @@ async function combineMethodResults(method1Results, method2Results, company, dow
     };
 }
 
-module.exports = { runLiabilitiesExtraction };
+// Helper functions for Excel formatting
+function addSectionHeader(worksheet, sectionTitle, isSuccess = true) {
+    const headerRow = worksheet.addRow(["", "", sectionTitle]);
+    const bgColor = isSuccess ? "FF90EE90" : "FFFF7474";
+    highlightCells(headerRow, "C", "J", bgColor, true);
+    applyBorders(headerRow, "C", "J", "thin");
+    headerRow.getCell('C').alignment = { horizontal: 'left', vertical: 'middle' };
+    headerRow.height = 20;
+    return headerRow;
+}
+
+function addNoDataRow(worksheet, message) {
+    const noDataRow = worksheet.addRow(["", "", message]);
+    highlightCells(noDataRow, "C", "J", "FFFFF2F2");
+    applyBorders(noDataRow, "C", "J", "thin");
+    noDataRow.getCell('C').alignment = { horizontal: 'left', vertical: 'middle' };
+    return noDataRow;
+}
+
+module.exports = { runEnhancedLiabilitiesExtraction };
