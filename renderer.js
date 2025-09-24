@@ -59,6 +59,10 @@ const elements = {
     // Step 7: General Ledger
     runLedgerExtraction: document.getElementById('runLedgerExtraction'),
     ledgerResults: document.getElementById('ledgerResults'),
+
+    // Tax Compliance
+    runTCCDownloader: document.getElementById('runTCCDownloader'),
+    tccResults: document.getElementById('tccResults'),
     
     // Step 5: VAT Returns
     vatDateRange: document.getElementsByName('vatDateRange'),
@@ -178,6 +182,11 @@ function setupEventListeners() {
     if (elements.runAllAutomations) {
         elements.runAllAutomations.addEventListener('click', runAllAutomations);
     }
+
+    // Tax Compliance
+    if (elements.runTCCDownloader) {
+        elements.runTCCDownloader.addEventListener('click', runTCCDownloader);
+    }
     
     // Configuration
     if (elements.selectFolder) {
@@ -229,7 +238,8 @@ function switchTab(tabId) {
         'liabilities': 5,
         'vat-returns': 6,
         'general-ledger': 7,
-        'all-automations': 8
+        'tax-compliance': 9,
+        'all-automations': 10
     };
     appState.currentStep = stepMap[tabId] || 1;
 }
@@ -294,6 +304,11 @@ function updateUIState() {
     // Step 6 buttons
     if (elements.runAllAutomations) {
         elements.runAllAutomations.disabled = !hasValidation || appState.isProcessing;
+    }
+
+    // Tax Compliance
+    if (elements.runTCCDownloader) {
+        elements.runTCCDownloader.disabled = !hasValidation || appState.isProcessing;
     }
     
     // Update tab completion status
@@ -387,6 +402,11 @@ function updateTabCompletionStatus() {
     if (appState.automationResults.ledger) {
         tabs[4]?.classList.add('completed');
     }
+
+    // Tax Compliance
+    if (appState.tccData) {
+        tabs[8]?.classList.add('completed');
+    }
 }
 
 // Toggle VAT date inputs
@@ -440,7 +460,12 @@ async function fetchCompanyDetails() {
         
         console.log('Calling fetch-manufacturer-details with PIN:', pin);
 
-        const result = await ipcRenderer.invoke('fetch-manufacturer-details', { pin });
+                const company = {
+            pin: pin,
+            password: elements.kraPassword?.value.trim()
+        };
+
+        const result = await ipcRenderer.invoke('fetch-manufacturer-details', { company });
 
         if (result.success && result.data) {
             // Reset related state when fetching new company details
@@ -451,6 +476,7 @@ async function fetchCompanyDetails() {
             appState.liabilitiesData = null; // Reset liabilities data
             appState.vatData = null; // Reset VAT data
             appState.ledgerData = null; // Reset ledger data
+            appState.tccData = null; // Reset TCC data
             updateValidationDisplay({ status: 'Not Validated' });
             if (elements.manufacturerInfo) elements.manufacturerInfo.innerHTML = ''; // Clear previous manufacturer details
 
@@ -1283,6 +1309,71 @@ async function runLedgerExtraction() {
 }
 
 // Step 8: Run all automations
+async function runTCCDownloader() {
+    console.log('Run TCC Downloader clicked');
+    if (!appState.companyData || !appState.hasValidation) {
+        await showMessage({
+            type: 'error',
+            title: 'Prerequisites Not Met',
+            message: 'Please validate credentials before downloading the TCC.'
+        });
+        return;
+    }
+
+    try {
+        appState.isProcessing = true;
+        updateUIState();
+        showProgressSection('Downloading Tax Compliance Certificate...');
+
+        const result = await ipcRenderer.invoke('run-tcc-downloader', {
+            company: appState.companyData,
+            downloadPath: elements.downloadPath.value
+        });
+
+        if (result.success) {
+            appState.tccData = result;
+            displayTCCResults(result);
+            hideProgressSection();
+            await showMessage({
+                type: 'info',
+                title: 'Success',
+                message: `TCC downloaded successfully! File saved at: ${result.files[0]}`
+            });
+        } else {
+            throw new Error(result.error || 'Failed to download TCC');
+        }
+    } catch (error) {
+        console.error('Error downloading TCC:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Error',
+            message: `Failed to download TCC: ${error.message}`
+        });
+        hideProgressSection();
+    } finally {
+        appState.isProcessing = false;
+        updateUIState();
+    }
+}
+
+function displayTCCResults(data) {
+    if (!elements.tccResults) return;
+
+    let contentHtml = `<h4>Download Complete</h4>`;
+    if (data.files && data.files.length > 0) {
+        contentHtml += `<p>File saved to: <a href="#" onclick="openFile('${data.files[0]}')">${data.files[0]}</a></p>`;
+    } else {
+        contentHtml += `<p>Could not retrieve file path.</p>`;
+    }
+
+    elements.tccResults.innerHTML = contentHtml;
+    elements.tccResults.classList.remove('hidden');
+}
+
+function openFile(filePath) {
+    ipcRenderer.send('open-file', filePath);
+}
+
 async function runAllAutomations() {
     console.log('Run All Automations clicked');
     

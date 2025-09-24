@@ -48,8 +48,12 @@
                 <span class="tab-number">8</span>
                 <span class="tab-title">Ledger</span>
             </button>
-            <button class="tab-btn" data-tab="all-automations">
+            <button class="tab-btn" data-tab="tax-compliance">
                 <span class="tab-number">9</span>
+                <span class="tab-title">Tax Compliance</span>
+            </button>
+            <button class="tab-btn" data-tab="all-automations">
+                <span class="tab-number">10</span>
                 <span class="tab-title">Run All</span>
             </button>
         </nav>
@@ -261,7 +265,21 @@
                 </div>
             </div>
 
-            <!-- Step 6: Run All Automations -->
+            <!-- Step 6: Tax Compliance -->
+            <div id="tax-compliance" class="tab-content">
+                <div class="content-header">
+                    <h2>Tax Compliance Certificate Downloader</h2>
+                    <p>Download the Tax Compliance Certificate for the selected company.</p>
+                </div>
+                <div class="automation-controls">
+                    <button id="runTCCDownloader" class="btn-primary">Download TCC</button>
+                </div>
+                <div id="tccResults" class="results-section hidden">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+
+            <!-- Step 7: Run All Automations -->
             <div id="all-automations" class="tab-content">
                 <div class="form-section compact">
                     <h2>Run All Automations</h2>

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -90,10 +90,10 @@ ipcMain.handle('show-message', async (event, options) => {
 });
 
 // Manufacturer Details API handler
-ipcMain.handle('fetch-manufacturer-details', async (event, { pin }) => {
+ipcMain.handle('fetch-manufacturer-details', async (event, { company }) => {
   try {
     const { fetchManufacturerDetails } = require('./automations/manufacturer-details');
-    return await fetchManufacturerDetails(pin, (progress) => {
+    return await fetchManufacturerDetails(company, (progress) => {
       mainWindow.webContents.send('automation-progress', progress);
     });
   } catch (error) {
@@ -205,6 +205,26 @@ ipcMain.handle('run-liabilities-extraction', async (event, { company, downloadPa
   } catch (error) {
     return { success: false, error: error.message };
   }
+});
+
+// TCC Downloader handler
+ipcMain.handle('run-tcc-downloader', async (event, { company, downloadPath }) => {
+  try {
+    const { runTCCDownloader } = require('./automations/tax-compliance-downloader');
+    return await runTCCDownloader(company, downloadPath, (progress) => {
+      mainWindow.webContents.send('automation-progress', progress);
+    });
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Open file handler
+ipcMain.on('open-file', (event, filePath) => {
+  shell.openPath(filePath).catch(err => {
+    console.error('Failed to open file:', err);
+    dialog.showErrorBox('File Error', `Could not open file at: ${filePath}`);
+  });
 });
 
 // Legacy extraction handler (for backward compatibility)

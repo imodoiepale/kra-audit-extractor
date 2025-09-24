@@ -1,7 +1,9 @@
+const { chromium } = require('playwright');
 const fetch = require('node-fetch');
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs').promises;
+const { createWorker } = require('tesseract.js');
 
 // Manufacturer Details API Configuration
 const MANUFACTURER_API_URL = 'https://itax.kra.go.ke/KRA-Portal/manufacturerAuthorizationController.htm?actionCode=fetchManDtl';
@@ -13,8 +15,12 @@ async function getAuthCookies() {
     return 'JSESSIONID=YOUR_SESSION_ID_HERE; TS0143c3c6=YOUR_TS_TOKEN_HERE';
 }
 
-async function getApiHeaders() {
-    const cookie = await getAuthCookies();
+async function getApiHeaders(page) {
+    const cookies = await page.context().cookies();
+    const cookie = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+    if (!cookie) {
+        throw new Error('Could not retrieve session cookie for API call.');
+    }
     return {
         'Accept': 'application/json, text/javascript, */*; q=0.01',
         'Accept-Language': 'en-US,en;q=0.9,sw;q=0.8',
@@ -31,7 +37,100 @@ async function getApiHeaders() {
     };
 }
 
-async function fetchManufacturerDetails(pin, progressCallback) {
+async function fetchManufacturerDetails(company, progressCallback) {
+    progressCallback({ stage: 'Manufacturer Details', message: 'Starting manufacturer details fetch...', progress: 5 });
+
+    let browser = null;
+    try {
+        browser = await chromium.launch({ headless: false, channel: 'chrome' });
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        page.setDefaultTimeout(60000);
+
+        const loginSuccess = await loginToKRA(page, company, progressCallback);
+        if (!loginSuccess) {
+            throw new Error('Login failed. Please check credentials and try again.');
+        }
+
+        const details = await getDetailsFromAPI(company.pin, page, progressCallback);
+
+        await browser.close();
+
+        return details;
+
+    } catch (error) {
+        console.error('Error during manufacturer details fetch:', error);
+        if (browser) {
+            await browser.close();
+        }
+        return { success: false, error: error.message };
+    }
+}
+
+async function loginToKRA(page, company, progressCallback) {
+    progressCallback({ log: 'Navigating to KRA portal for session...' });
+    await page.goto("https://itax.kra.go.ke/KRA-Portal/");
+    await page.waitForTimeout(1000);
+
+    await page.locator("#logid").click();
+    await page.locator("#logid").fill(company.pin);
+    await page.evaluate(() => { CheckPIN(); });
+
+    try {
+        await page.locator('input[name="xxZTT9p2wQ"]').fill(company.password, { timeout: 2000 });
+    } catch (error) {
+        throw new Error('Could not find password field.');
+    }
+
+    await page.waitForTimeout(1500);
+    progressCallback({ log: 'Solving captcha for session...' });
+
+    const image = await page.waitForSelector("#captcha_img");
+    const tempPath = path.join(__dirname, '..', 'temp');
+    await fs.mkdir(tempPath, { recursive: true });
+    const imagePath = path.join(tempPath, `captcha_session_${company.pin}.png`);
+    await image.screenshot({ path: imagePath });
+
+    const worker = await createWorker('eng', 1);
+    let result;
+
+    const extractResult = async () => {
+        const ret = await worker.recognize(imagePath);
+        const text1 = ret.data.text.slice(0, -1);
+        const text = text1.slice(0, -1);
+        const numbers = text.match(/\d+/g);
+        if (!numbers || numbers.length < 2) throw new Error("Unable to extract valid numbers from CAPTCHA");
+        result = text.includes("+") ? Number(numbers[0]) + Number(numbers[1]) : Number(numbers[0]) - Number(numbers[1]);
+    };
+
+    let attempts = 0;
+    while (attempts < 5) {
+        try {
+            await extractResult();
+            break;
+        } catch (error) {
+            attempts++;
+            if (attempts >= 5) throw new Error('Failed to solve captcha after multiple attempts.');
+            await page.waitForTimeout(1000);
+            await image.screenshot({ path: imagePath });
+        }
+    }
+    await worker.terminate();
+
+    await page.type("#captcahText", result.toString());
+    await page.click("#loginButton");
+    await page.waitForTimeout(2000);
+
+    const mainMenu = await page.waitForSelector("#ddtopmenubar > ul > li:nth-child(1) > a", { timeout: 5000, state: "visible" }).catch(() => false);
+    if (mainMenu) {
+        progressCallback({ log: 'Session login successful!' });
+        return true;
+    }
+
+    throw new Error('Login failed to establish session.');
+}
+
+async function getDetailsFromAPI(pin, page, progressCallback) {
     try {
         progressCallback({
             stage: 'Manufacturer Details',
@@ -42,7 +141,7 @@ async function fetchManufacturerDetails(pin, progressCallback) {
         const formData = new URLSearchParams();
         formData.append('manPin', pin);
 
-        const headers = await getApiHeaders();
+        const headers = await getApiHeaders(page);
         const response = await fetch(MANUFACTURER_API_URL, {
             method: 'POST',
             headers: headers,
