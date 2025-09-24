@@ -28,24 +28,28 @@
                 <span class="tab-number">3</span>
                 <span class="tab-title">Details</span>
             </button>
-            <button class="tab-btn" data-tab="obligation-checker">
+            <button class="tab-btn" data-tab="director-details">
                 <span class="tab-number">4</span>
+                <span class="tab-title">Director Details</span>
+            </button>
+            <button class="tab-btn" data-tab="obligation-checker">
+                <span class="tab-number">5</span>
                 <span class="tab-title">Obligations</span>
             </button>
             <button class="tab-btn" data-tab="liabilities">
-                <span class="tab-number">5</span>
+                <span class="tab-number">6</span>
                 <span class="tab-title">Liabilities</span>
             </button>
             <button class="tab-btn" data-tab="vat-returns">
-                <span class="tab-number">6</span>
+                <span class="tab-number">7</span>
                 <span class="tab-title">VAT</span>
             </button>
             <button class="tab-btn" data-tab="general-ledger">
-                <span class="tab-number">7</span>
+                <span class="tab-number">8</span>
                 <span class="tab-title">Ledger</span>
             </button>
             <button class="tab-btn" data-tab="all-automations">
-                <span class="tab-number">8</span>
+                <span class="tab-number">9</span>
                 <span class="tab-title">Run All</span>
             </button>
         </nav>
@@ -127,7 +131,19 @@
                 </div>
             </div>
 
-            <!-- Step 4: Obligation Checker -->
+            <!-- Step 4: Director Details -->
+            <div id="director-details" class="tab-content">
+                <div class="form-section compact">
+                    <h2>Director Details Extraction</h2>
+                    <p class="step-description">Extract company director and associate details.</p>
+                    <div class="action-group">
+                        <button id="runDirectorDetailsExtraction" class="primary-btn" disabled>Extract Director Details</button>
+                    </div>
+                    <div id="directorDetailsResults" class="result-section hidden"></div>
+                </div>
+            </div>
+
+            <!-- Step 5: Obligation Checker -->
             <div id="obligation-checker" class="tab-content">
                 <div class="form-section compact">
                     <h2>Obligation Checker</h2>
@@ -221,6 +237,10 @@
 
                     <div class="action-group">
                         <button id="runVATExtraction" class="primary-btn" disabled>Extract VAT Data</button>
+                    </div>
+                    
+                    <div id="vatResults" class="result-section hidden">
+                        <!-- VAT results will be displayed here -->
                     </div>
                 </div>
             </div>

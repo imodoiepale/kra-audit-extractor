@@ -73,6 +73,102 @@ async function optionExists(locator, value) {
     return false;
 }
 
+// Function to discover all available tax types dynamically
+async function discoverAllTaxTypes(page, progressCallback) {
+    progressCallback({ log: 'Method 2: Discovering all available tax types...' });
+    
+    const taxTypes = [];
+    
+    try {
+        // Get all tax head options
+        const taxHeadOptions = await page.locator('#cmbTaxHead option').evaluateAll(options => {
+            return options.map(option => ({
+                value: option.value,
+                text: option.textContent.trim()
+            })).filter(opt => opt.value && opt.value !== '' && opt.text !== 'Select');
+        });
+        
+        progressCallback({ log: `Method 2: Found ${taxHeadOptions.length} tax heads: ${taxHeadOptions.map(t => t.text).join(', ')}` });
+        
+        // For each tax head, discover sub-heads
+        for (const taxHead of taxHeadOptions) {
+            try {
+                await page.locator('#cmbTaxHead').selectOption(taxHead.value);
+                await page.waitForTimeout(500);
+                
+                // Get sub-head options for this tax head
+                const subHeadOptions = await page.locator('#cmbTaxSubHead option').evaluateAll(options => {
+                    return options.map(option => ({
+                        value: option.value,
+                        text: option.textContent.trim()
+                    })).filter(opt => opt.value && opt.value !== '' && opt.text !== 'Select');
+                });
+                
+                // Add each valid combination
+                for (const subHead of subHeadOptions) {
+                    const taxTypeName = `${taxHead.text} - ${subHead.text}`;
+                    taxTypes.push({
+                        taxHead: taxHead.value,
+                        taxSubHead: subHead.value,
+                        name: taxTypeName,
+                        taxHeadText: taxHead.text,
+                        taxSubHeadText: subHead.text
+                    });
+                }
+                
+                progressCallback({ 
+                    log: `Method 2: ${taxHead.text} has ${subHeadOptions.length} sub-types` 
+                });
+                
+            } catch (error) {
+                progressCallback({ 
+                    log: `Method 2: Error processing tax head ${taxHead.text}: ${error.message}`, 
+                    logType: 'warning' 
+                });
+            }
+        }
+        
+        // Filter to common/important tax types if too many found
+        const priorityTaxTypes = taxTypes.filter(tax => {
+            const name = tax.name.toLowerCase();
+            return name.includes('income tax') || 
+                   name.includes('vat') || 
+                   name.includes('paye') || 
+                   name.includes('withholding') || 
+                   name.includes('stamp duty') || 
+                   name.includes('excise') || 
+                   name.includes('rental') || 
+                   name.includes('dividend') || 
+                   name.includes('interest') || 
+                   name.includes('royalty') || 
+                   name.includes('management') || 
+                   name.includes('professional') || 
+                   name.includes('commission');
+        });
+        
+        const finalTaxTypes = priorityTaxTypes.length > 0 ? priorityTaxTypes : taxTypes.slice(0, 15); // Limit to 15 if no priorities found
+        
+        progressCallback({ 
+            log: `Method 2: Selected ${finalTaxTypes.length} tax types for processing` 
+        });
+        
+        return finalTaxTypes;
+        
+    } catch (error) {
+        progressCallback({ 
+            log: `Method 2: Error discovering tax types: ${error.message}`, 
+            logType: 'error' 
+        });
+        
+        // Fallback to basic tax types
+        return [
+            { taxHead: 'IT', taxSubHead: '4', name: 'Income Tax - Company' },
+            { taxHead: 'VAT', taxSubHead: '9', name: 'VAT' },
+            { taxHead: 'IT', taxSubHead: '7', name: 'PAYE' }
+        ];
+    }
+}
+
 // Enhanced function to run both liabilities extraction methods
 async function runLiabilitiesExtraction(company, downloadPath, progressCallback) {
     // Create a company-specific subfolder within the user-selected download path
@@ -498,23 +594,60 @@ async function runMethod2_PaymentRegistration(page, company, downloadFolderPath,
         await page.click("#openPayRegForm");
         page.once("dialog", dialog => { dialog.accept().catch(() => { }); });
 
-        // Process Income Tax - Company
-        const itResults = await processPaymentRegistrationTax(page, company, "IT", "4", "Income Tax - Company", downloadFolderPath, progressCallback);
-        allExtractedData = allExtractedData.concat(itResults.data);
-        totalAmount += itResults.totalAmount;
-
-        // Process VAT
-        const vatResults = await processPaymentRegistrationTax(page, company, "VAT", "9", "VAT", downloadFolderPath, progressCallback);
-        allExtractedData = allExtractedData.concat(vatResults.data);
-        totalAmount += vatResults.totalAmount;
-
-        // Process PAYE
-        const payeResults = await processPaymentRegistrationTax(page, company, "IT", "7", "PAYE", downloadFolderPath, progressCallback);
-        allExtractedData = allExtractedData.concat(payeResults.data);
-        totalAmount += payeResults.totalAmount;
+        // Discover and process ALL available tax types dynamically
+        const allTaxTypes = await discoverAllTaxTypes(page, progressCallback);
+        
+        progressCallback({ 
+            log: `Method 2: Found ${allTaxTypes.length} tax types to process: ${allTaxTypes.map(t => t.name).join(', ')}` 
+        });
+        
+        // Process each discovered tax type
+        for (const taxType of allTaxTypes) {
+            try {
+                const results = await processPaymentRegistrationTax(
+                    page, 
+                    company, 
+                    taxType.taxHead, 
+                    taxType.taxSubHead, 
+                    taxType.name, 
+                    downloadFolderPath, 
+                    progressCallback
+                );
+                
+                if (results.data.length > 0) {
+                    allExtractedData = allExtractedData.concat(results.data);
+                    totalAmount += results.totalAmount;
+                    
+                    progressCallback({ 
+                        log: `Method 2: ${taxType.name} - Added ${results.recordCount} records, Amount: KES ${results.totalAmount.toLocaleString()}` 
+                    });
+                }
+            } catch (error) {
+                progressCallback({ 
+                    log: `Method 2: Error processing ${taxType.name}: ${error.message}`, 
+                    logType: 'warning' 
+                });
+            }
+        }
 
         progressCallback({ 
             log: `Method 2: Total extracted ${allExtractedData.length} records with total: KES ${totalAmount.toLocaleString()}` 
+        });
+
+        // Create breakdown by tax type
+        const breakdown = {};
+        allTaxTypes.forEach(taxType => {
+            const taxData = allExtractedData.filter(record => record.taxType === taxType.name);
+            if (taxData.length > 0) {
+                // Get headers from first record
+                const headers = taxData[0].rawData ? Object.keys(taxData[0].rawData) : [];
+                breakdown[taxType.name] = {
+                    data: taxData,
+                    headers: headers,
+                    recordCount: taxData.length,
+                    totalAmount: taxData.reduce((sum, record) => sum + (record.totalAmountDue || 0), 0)
+                };
+            }
         });
 
         return {
@@ -523,11 +656,8 @@ async function runMethod2_PaymentRegistration(page, company, downloadFolderPath,
             totalAmount: totalAmount,
             recordCount: allExtractedData.length,
             method: 'Payment Registration',
-            breakdown: {
-                incomeTax: itResults,
-                vat: vatResults,
-                paye: payeResults
-            }
+            breakdown: breakdown,
+            discoveredTaxTypes: allTaxTypes
         };
 
     } catch (error) {
@@ -550,6 +680,7 @@ async function runMethod2_PaymentRegistration(page, company, downloadFolderPath,
 async function processPaymentRegistrationTax(page, company, taxHead, taxSubHead, taxName, downloadFolderPath, progressCallback) {
     let extractedData = [];
     let totalAmount = 0;
+    let headers = [];
 
     try {
         progressCallback({ log: `Method 2: Processing ${taxName}...` });
@@ -563,7 +694,7 @@ async function processPaymentRegistrationTax(page, company, taxHead, taxSubHead,
         
         if (!subHeadExists) {
             progressCallback({ log: `Method 2: ${taxName} option not available for this company` });
-            return { data: extractedData, totalAmount: 0, recordCount: 0 };
+            return { data: extractedData, totalAmount: 0, recordCount: 0, headers: [], taxType: taxName };
         }
 
         await page.locator("#cmbTaxSubHead").selectOption(taxSubHead);
@@ -579,7 +710,8 @@ async function processPaymentRegistrationTax(page, company, taxHead, taxSubHead,
         }).catch(() => null);
 
         if (liabilitiesTable) {
-            const headers = await liabilitiesTable.evaluate(table => {
+            // Extract headers dynamically from KRA table
+            headers = await liabilitiesTable.evaluate(table => {
                 const headerRow = table.querySelector("thead tr");
                 return Array.from(headerRow.querySelectorAll("th")).map(th => th.innerText.trim());
             });
@@ -598,30 +730,57 @@ async function processPaymentRegistrationTax(page, company, taxHead, taxSubHead,
                 });
             });
 
-            // Skip header row if present
+            // Skip header row if present in data
             if (tableContent.length > 0 && tableContent[0].some(cell => headers.includes(cell))) {
                 tableContent.shift();
             }
 
+            // Process each row with dynamic column mapping
             tableContent.forEach(row => {
                 // Skip empty rows or radio button rows
                 if (row.length > 1 && row[1] && row[1] !== '') {
-                    const amountText = row[5] || '0'; // Amount is typically in column 6 (index 5)
-                    const amountValue = parseFloat(amountText.replace(/[^0-9.-]+/g, "")) || 0;
-                    
-                    if (amountValue > 0) {
-                        totalAmount += amountValue;
-                        
-                        extractedData.push({
-                            method: 'Payment Registration',
-                            taxType: taxName,
-                            period: row[1] || 'N/A',
-                            dueDate: row[2] || 'N/A',
-                            description: row[3] || 'N/A',
-                            amount: amountValue,
-                            status: 'Outstanding',
-                            source: `Method 2 - ${taxName}`
-                        });
+                    // Create a record with all available columns
+                    const record = {
+                        method: 'Payment Registration',
+                        taxType: taxName,
+                        source: `Method 2 - ${taxName}`,
+                        rawData: {} // Store all column data
+                    };
+
+                    // Map all columns dynamically
+                    headers.forEach((header, index) => {
+                        if (index > 0 && row[index]) { // Skip first column (radio button)
+                            const value = row[index].trim();
+                            record.rawData[header] = value;
+                            
+                            // Map common fields
+                            const headerLower = header.toLowerCase();
+                            if (headerLower.includes('period')) {
+                                record.taxPeriod = value;
+                            } else if (headerLower.includes('due') && headerLower.includes('date')) {
+                                record.dueDate = value;
+                            } else if (headerLower.includes('principal')) {
+                                record.principalAmount = parseFloat(value.replace(/[^0-9.-]+/g, "")) || 0;
+                            } else if (headerLower.includes('penalty')) {
+                                record.penalty = parseFloat(value.replace(/[^0-9.-]+/g, "")) || 0;
+                            } else if (headerLower.includes('interest')) {
+                                record.interest = parseFloat(value.replace(/[^0-9.-]+/g, "")) || 0;
+                            } else if (headerLower.includes('amount') && (headerLower.includes('paid') || headerLower.includes('due') || headerLower.includes('payable'))) {
+                                // This is the main amount to be paid - use this for totals
+                                const numValue = parseFloat(value.replace(/[^0-9.-]+/g, "")) || 0;
+                                if (numValue > 0) {
+                                    record.totalAmountDue = numValue;
+                                    totalAmount += numValue; // Only add the main amount to total
+                                }
+                            } else if (headerLower.includes('status')) {
+                                record.status = value;
+                            }
+                        }
+                    });
+
+                    // Only add records with meaningful data
+                    if (Object.keys(record.rawData).length > 0) {
+                        extractedData.push(record);
                     }
                 }
             });
@@ -650,6 +809,7 @@ async function processPaymentRegistrationTax(page, company, taxHead, taxSubHead,
         data: extractedData, 
         totalAmount: totalAmount, 
         recordCount: extractedData.length,
+        headers: headers.slice(1), // Remove first column (radio button)
         taxType: taxName
     };
 }
@@ -705,15 +865,28 @@ async function combineMethodResults(method1Results, method2Results, company, dow
 
     worksheet.addRow(); // Blank row
 
-    if (allData.length > 0) {
-        // Add headers
-        const headers = ["Method", "Tax Type", "Period", "Due Date", "Description", "Amount", "Status", "Source"];
-        const headersRow = worksheet.addRow(["", "", ...headers]);
-        highlightCells(headersRow, "C", "J", "FFD3D3D3", true);
-        applyBorders(headersRow, "C", "J", "thin");
+    // METHOD 1 SECTION - VAT Refund
+    if (method1Results.data.length > 0) {
+        // Method 1 Header
+        const method1HeaderRow = worksheet.addRow([
+            "", 
+            "📋 METHOD 1: VAT REFUND APPROACH", 
+            `Records: ${method1Results.recordCount}`, 
+            `Amount: KES ${method1Results.totalAmount.toLocaleString()}`
+        ]);
+        worksheet.mergeCells(`B${method1HeaderRow.number}:D${method1HeaderRow.number}`);
+        highlightCells(method1HeaderRow, "B", "J", "FF87CEEB", true);
+        applyBorders(method1HeaderRow, "B", "J", "thin");
+        method1HeaderRow.getCell('B').font = { size: 12, bold: true };
 
-        // Add data rows
-        allData.forEach(record => {
+        // Method 1 Headers
+        const headers1 = ["Method", "Tax Type", "Period", "Due Date", "Description", "Amount", "Status", "Source"];
+        const headersRow1 = worksheet.addRow(["", "", ...headers1]);
+        highlightCells(headersRow1, "C", "J", "FFD3D3D3", true);
+        applyBorders(headersRow1, "C", "J", "thin");
+
+        // Method 1 Data
+        method1Results.data.forEach(record => {
             const dataRow = worksheet.addRow([
                 "",
                 "",
@@ -730,20 +903,117 @@ async function combineMethodResults(method1Results, method2Results, company, dow
             formatCurrencyCells(dataRow, "H", "H");
         });
 
-        // Add total row
-        const totalRow = worksheet.addRow([
-            "", "", "TOTAL", "", "", "", "", totalAmount, "", ""
+        // Method 1 Total
+        const totalRow1 = worksheet.addRow([
+            "", "", "METHOD 1 TOTAL", "", "", "", "", method1Results.totalAmount, "", ""
         ]);
-        highlightCells(totalRow, "C", "J", "FFE4EE99", true);
-        applyBorders(totalRow, "C", "J", "thin");
-        formatCurrencyCells(totalRow, "H", "H");
-        totalRow.getCell('H').font = { bold: true };
+        highlightCells(totalRow1, "C", "J", "FFADD8E6", true);
+        applyBorders(totalRow1, "C", "J", "thin");
+        formatCurrencyCells(totalRow1, "H", "H");
+        totalRow1.getCell('H').font = { bold: true };
+        
+        worksheet.addRow(); // Blank row between methods
     } else {
-        const noDataRow = worksheet.addRow(["", "", "No liabilities data found using either method"]);
-        worksheet.mergeCells(`C${noDataRow.number}:J${noDataRow.number}`);
-        highlightCells(noDataRow, "C", "J", "FFFFF2F2");
-        applyBorders(noDataRow, "C", "J", "thin");
+        const noDataRow1 = worksheet.addRow(["", "", "📋 METHOD 1: VAT REFUND - No data found"]);
+        worksheet.mergeCells(`C${noDataRow1.number}:J${noDataRow1.number}`);
+        highlightCells(noDataRow1, "C", "J", "FFFFF2F2");
+        applyBorders(noDataRow1, "C", "J", "thin");
+        worksheet.addRow(); // Blank row
     }
+
+    // METHOD 2 SECTION - Payment Registration
+    if (method2Results.data.length > 0) {
+        // Method 2 Header
+        const method2HeaderRow = worksheet.addRow([
+            "", 
+            "💳 METHOD 2: PAYMENT REGISTRATION APPROACH", 
+            `Records: ${method2Results.recordCount}`, 
+            `Amount: KES ${method2Results.totalAmount.toLocaleString()}`
+        ]);
+        worksheet.mergeCells(`B${method2HeaderRow.number}:D${method2HeaderRow.number}`);
+        highlightCells(method2HeaderRow, "B", "J", "FFADD8E6", true);
+        applyBorders(method2HeaderRow, "B", "J", "thin");
+        method2HeaderRow.getCell('B').font = { size: 12, bold: true };
+
+        // Method 2 Headers - Use dynamic headers from KRA
+        const allMethod2Headers = new Set();
+        method2Results.breakdown?.incomeTax?.headers?.forEach(h => allMethod2Headers.add(h));
+        method2Results.breakdown?.vat?.headers?.forEach(h => allMethod2Headers.add(h));
+        method2Results.breakdown?.paye?.headers?.forEach(h => allMethod2Headers.add(h));
+        
+        const method2Headers = ["Tax Type", ...Array.from(allMethod2Headers)];
+        const headersRow2 = worksheet.addRow(["", "", ...method2Headers]);
+        highlightCells(headersRow2, "C", String.fromCharCode(67 + method2Headers.length), "FFD3D3D3", true);
+        applyBorders(headersRow2, "C", String.fromCharCode(67 + method2Headers.length), "thin");
+
+        // Method 2 Data
+        method2Results.data.forEach(record => {
+            const rowData = ["", "", record.taxType || 'N/A'];
+            
+            // Add data for each header column
+            Array.from(allMethod2Headers).forEach(header => {
+                rowData.push(record.rawData?.[header] || 'N/A');
+            });
+            
+            const dataRow = worksheet.addRow(rowData);
+            applyBorders(dataRow, "C", String.fromCharCode(67 + method2Headers.length), "thin");
+            
+            // Format currency columns
+            Array.from(allMethod2Headers).forEach((header, index) => {
+                const headerLower = header.toLowerCase();
+                if (headerLower.includes('amount') || headerLower.includes('penalty') || 
+                    headerLower.includes('interest') || headerLower.includes('total')) {
+                    formatCurrencyCells(dataRow, String.fromCharCode(68 + index), String.fromCharCode(68 + index));
+                }
+            });
+        });
+
+        // Method 2 Total - Calculate totals for each numeric column
+        const totalRowData = ["", "", "METHOD 2 TOTAL"];
+        const totalValues = {};
+        
+        // Calculate totals for each column
+        method2Results.data.forEach(record => {
+            Array.from(allMethod2Headers).forEach(header => {
+                const value = record.rawData?.[header];
+                if (value) {
+                    const numValue = parseFloat(value.replace(/[^0-9.-]+/g, "")) || 0;
+                    if (numValue > 0) {
+                        totalValues[header] = (totalValues[header] || 0) + numValue;
+                    }
+                }
+            });
+        });
+        
+        // Add total values to row
+        Array.from(allMethod2Headers).forEach(header => {
+            totalRowData.push(totalValues[header] || 0);
+        });
+        
+        const totalRow2 = worksheet.addRow(totalRowData);
+        highlightCells(totalRow2, "C", String.fromCharCode(67 + method2Headers.length), "FFADD8E6", true);
+        applyBorders(totalRow2, "C", String.fromCharCode(67 + method2Headers.length), "thin");
+        
+        // Format currency columns in total row
+        Array.from(allMethod2Headers).forEach((header, index) => {
+            const headerLower = header.toLowerCase();
+            if (headerLower.includes('amount') || headerLower.includes('penalty') || 
+                headerLower.includes('interest') || headerLower.includes('total')) {
+                formatCurrencyCells(totalRow2, String.fromCharCode(68 + index), String.fromCharCode(68 + index));
+                totalRow2.getCell(String.fromCharCode(68 + index)).font = { bold: true };
+            }
+        });
+        
+        worksheet.addRow(); // Blank row
+    } else {
+        const noDataRow2 = worksheet.addRow(["", "", "💳 METHOD 2: PAYMENT REGISTRATION - No data found"]);
+        worksheet.mergeCells(`C${noDataRow2.number}:J${noDataRow2.number}`);
+        highlightCells(noDataRow2, "C", "J", "FFFFF2F2");
+        applyBorders(noDataRow2, "C", "J", "thin");
+        worksheet.addRow(); // Blank row
+    }
+
+    // No Grand Total - each method has its own totals
 
     // Auto-fit columns and save
     autoFitColumns(worksheet);

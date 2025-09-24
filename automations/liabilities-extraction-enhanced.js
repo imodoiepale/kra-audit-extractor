@@ -544,15 +544,28 @@ async function combineResults(method1Results, method2Results, company, downloadF
 
     worksheet.addRow(); // Blank row
 
-    if (allData.length > 0) {
-        // Add headers
-        const headers = ["Method", "Tax Type", "Period", "Due Date", "Description", "Amount", "Status", "Source"];
-        const headersRow = worksheet.addRow(["", "", ...headers]);
-        highlightCells(headersRow, "C", "J", "FFD3D3D3", true);
-        applyBorders(headersRow, "C", "J", "thin");
+    // METHOD 1 SECTION - VAT Refund
+    if (method1Results.data.length > 0) {
+        // Method 1 Header
+        const method1HeaderRow = worksheet.addRow([
+            "", 
+            "📋 METHOD 1: VAT REFUND APPROACH", 
+            `Records: ${method1Results.recordCount}`, 
+            `Amount: KES ${method1Results.totalAmount.toLocaleString()}`
+        ]);
+        worksheet.mergeCells(`B${method1HeaderRow.number}:D${method1HeaderRow.number}`);
+        highlightCells(method1HeaderRow, "B", "J", "FF87CEEB", true);
+        applyBorders(method1HeaderRow, "B", "J", "thin");
+        method1HeaderRow.getCell('B').font = { size: 12, bold: true };
 
-        // Add data rows
-        allData.forEach(record => {
+        // Method 1 Headers
+        const headers1 = ["Method", "Tax Type", "Period", "Due Date", "Description", "Amount", "Status", "Source"];
+        const headersRow1 = worksheet.addRow(["", "", ...headers1]);
+        highlightCells(headersRow1, "C", "J", "FFD3D3D3", true);
+        applyBorders(headersRow1, "C", "J", "thin");
+
+        // Method 1 Data
+        method1Results.data.forEach(record => {
             const dataRow = worksheet.addRow([
                 "",
                 "",
@@ -569,14 +582,90 @@ async function combineResults(method1Results, method2Results, company, downloadF
             formatCurrencyCells(dataRow, "H", "H");
         });
 
-        // Add total row
-        const totalRow = worksheet.addRow([
-            "", "", "TOTAL", "", "", "", "", totalAmount, "", ""
+        // Method 1 Total
+        const totalRow1 = worksheet.addRow([
+            "", "", "METHOD 1 TOTAL", "", "", "", "", method1Results.totalAmount, "", ""
         ]);
-        highlightCells(totalRow, "C", "J", "FFE4EE99", true);
-        applyBorders(totalRow, "C", "J", "thin");
-        formatCurrencyCells(totalRow, "H", "H");
-        totalRow.getCell('H').font = { bold: true };
+        highlightCells(totalRow1, "C", "J", "FFADD8E6", true);
+        applyBorders(totalRow1, "C", "J", "thin");
+        formatCurrencyCells(totalRow1, "H", "H");
+        totalRow1.getCell('H').font = { bold: true };
+        
+        worksheet.addRow(); // Blank row between methods
+    } else {
+        const noDataRow1 = worksheet.addRow(["", "", "📋 METHOD 1: VAT REFUND - No data found"]);
+        worksheet.mergeCells(`C${noDataRow1.number}:J${noDataRow1.number}`);
+        highlightCells(noDataRow1, "C", "J", "FFFFF2F2");
+        applyBorders(noDataRow1, "C", "J", "thin");
+        worksheet.addRow(); // Blank row
+    }
+
+    // METHOD 2 SECTION - Payment Registration
+    if (method2Results.data.length > 0) {
+        // Method 2 Header
+        const method2HeaderRow = worksheet.addRow([
+            "", 
+            "💳 METHOD 2: PAYMENT REGISTRATION APPROACH", 
+            `Records: ${method2Results.recordCount}`, 
+            `Amount: KES ${method2Results.totalAmount.toLocaleString()}`
+        ]);
+        worksheet.mergeCells(`B${method2HeaderRow.number}:D${method2HeaderRow.number}`);
+        highlightCells(method2HeaderRow, "B", "J", "FFADD8E6", true);
+        applyBorders(method2HeaderRow, "B", "J", "thin");
+        method2HeaderRow.getCell('B').font = { size: 12, bold: true };
+
+        // Method 2 Headers
+        const headers2 = ["Method", "Tax Type", "Period", "Due Date", "Description", "Amount", "Status", "Source"];
+        const headersRow2 = worksheet.addRow(["", "", ...headers2]);
+        highlightCells(headersRow2, "C", "J", "FFD3D3D3", true);
+        applyBorders(headersRow2, "C", "J", "thin");
+
+        // Method 2 Data
+        method2Results.data.forEach(record => {
+            const dataRow = worksheet.addRow([
+                "",
+                "",
+                record.method || 'N/A',
+                record.taxType || 'N/A',
+                record.period || 'N/A',
+                record.dueDate || 'N/A',
+                record.description || 'N/A',
+                record.amount || 0,
+                record.status || 'N/A',
+                record.source || 'N/A'
+            ]);
+            applyBorders(dataRow, "C", "J", "thin");
+            formatCurrencyCells(dataRow, "H", "H");
+        });
+
+        // Method 2 Total
+        const totalRow2 = worksheet.addRow([
+            "", "", "METHOD 2 TOTAL", "", "", "", "", method2Results.totalAmount, "", ""
+        ]);
+        highlightCells(totalRow2, "C", "J", "FFADD8E6", true);
+        applyBorders(totalRow2, "C", "J", "thin");
+        formatCurrencyCells(totalRow2, "H", "H");
+        totalRow2.getCell('H').font = { bold: true };
+        
+        worksheet.addRow(); // Blank row
+    } else {
+        const noDataRow2 = worksheet.addRow(["", "", "💳 METHOD 2: PAYMENT REGISTRATION - No data found"]);
+        worksheet.mergeCells(`C${noDataRow2.number}:J${noDataRow2.number}`);
+        highlightCells(noDataRow2, "C", "J", "FFFFF2F2");
+        applyBorders(noDataRow2, "C", "J", "thin");
+        worksheet.addRow(); // Blank row
+    }
+
+    // GRAND TOTAL SECTION
+    if (allData.length > 0) {
+        const grandTotalRow = worksheet.addRow([
+            "", "", "🎯 GRAND TOTAL (BOTH METHODS)", "", "", "", "", totalAmount, "", ""
+        ]);
+        highlightCells(grandTotalRow, "C", "J", "FFE4EE99", true);
+        applyBorders(grandTotalRow, "C", "J", "thin");
+        formatCurrencyCells(grandTotalRow, "H", "H");
+        grandTotalRow.getCell('H').font = { bold: true, size: 12 };
+        grandTotalRow.getCell('C').font = { bold: true, size: 11 };
     } else {
         const noDataRow = worksheet.addRow(["", "", "No liabilities data found using either method"]);
         worksheet.mergeCells(`C${noDataRow.number}:J${noDataRow.number}`);

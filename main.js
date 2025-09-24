@@ -183,6 +183,18 @@ ipcMain.handle('run-obligation-check', async (event, { company }) => {
   }
 });
 
+// Director Details extraction handler
+ipcMain.handle('run-director-details-extraction', async (event, { company, downloadPath }) => {
+  try {
+    const { runDirectorDetailsExtraction } = require('./automations/director-details-extraction');
+    return await runDirectorDetailsExtraction(company, downloadPath, (progress) => {
+      mainWindow.webContents.send('automation-progress', progress);
+    });
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 // Liabilities extraction handler
 ipcMain.handle('run-liabilities-extraction', async (event, { company, downloadPath }) => {
   try {
