@@ -4,6 +4,7 @@ const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs').promises;
 const { createWorker } = require('tesseract.js');
+const SharedWorkbookManager = require('./shared-workbook-manager');
 
 // Manufacturer Details API Configuration
 const MANUFACTURER_API_URL = 'https://itax.kra.go.ke/KRA-Portal/manufacturerAuthorizationController.htm?actionCode=fetchManDtl';
@@ -38,97 +39,85 @@ async function getApiHeaders(page) {
 }
 
 async function fetchManufacturerDetails(company, progressCallback) {
-    progressCallback({ stage: 'Manufacturer Details', message: 'Starting manufacturer details fetch...', progress: 5 });
+    progressCallback({ stage: 'Manufacturer Details', message: 'Fetching manufacturer details...', progress: 10 });
 
-    let browser = null;
     try {
-        browser = await chromium.launch({ headless: false, channel: 'chrome' });
-        const context = await browser.newContext();
-        const page = await context.newPage();
-        page.setDefaultTimeout(60000);
+        const pin = company.pin || company;
+        
+        progressCallback({
+            progress: 30,
+            log: `Fetching manufacturer details for PIN: ${pin}`
+        });
 
-        const loginSuccess = await loginToKRA(page, company, progressCallback);
-        if (!loginSuccess) {
-            throw new Error('Login failed. Please check credentials and try again.');
+        // Call the API directly (it's a public endpoint)
+        const formData = new URLSearchParams();
+        formData.append('manPin', pin);
+
+        const response = await fetch(MANUFACTURER_API_URL, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Origin': 'https://itax.kra.go.ke',
+                'Referer': 'https://itax.kra.go.ke/KRA-Portal/manufacturerAuthorizationController.htm?actionCode=appForManufacturerAuth',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: formData.toString(),
+        });
+
+        progressCallback({
+            progress: 60,
+            log: 'API request sent, processing response...'
+        });
+
+        if (!response.ok) {
+            throw new Error(`API request failed with status: ${response.status}`);
         }
 
-        const details = await getDetailsFromAPI(company.pin, page, progressCallback);
+        const data = await response.json();
 
-        await browser.close();
+        progressCallback({
+            progress: 80,
+            log: 'Response received, validating data...'
+        });
 
-        return details;
+        // Check for API errors
+        if (data.errorDTO && Object.keys(data.errorDTO).length > 0 && data.errorDTO.message) {
+            throw new Error(`KRA API Error: ${data.errorDTO.message}`);
+        }
+
+        // Validate that we have meaningful data
+        if (!data.timsManBasicRDtlDTO || !data.timsManBasicRDtlDTO.manufacturerName) {
+            throw new Error('No manufacturer data found for this PIN');
+        }
+
+        progressCallback({
+            progress: 100,
+            log: 'Manufacturer details retrieved successfully',
+            logType: 'success'
+        });
+
+        return {
+            success: true,
+            data: data
+        };
 
     } catch (error) {
-        console.error('Error during manufacturer details fetch:', error);
-        if (browser) {
-            await browser.close();
-        }
-        return { success: false, error: error.message };
+        progressCallback({
+            log: `Error fetching manufacturer details: ${error.message}`,
+            logType: 'error'
+        });
+
+        return {
+            success: false,
+            error: error.message
+        };
     }
 }
 
-async function loginToKRA(page, company, progressCallback) {
-    progressCallback({ log: 'Navigating to KRA portal for session...' });
-    await page.goto("https://itax.kra.go.ke/KRA-Portal/");
-    await page.waitForTimeout(1000);
 
-    await page.locator("#logid").click();
-    await page.locator("#logid").fill(company.pin);
-    await page.evaluate(() => { CheckPIN(); });
-
-    try {
-        await page.locator('input[name="xxZTT9p2wQ"]').fill(company.password, { timeout: 2000 });
-    } catch (error) {
-        throw new Error('Could not find password field.');
-    }
-
-    await page.waitForTimeout(1500);
-    progressCallback({ log: 'Solving captcha for session...' });
-
-    const image = await page.waitForSelector("#captcha_img");
-    const tempPath = path.join(__dirname, '..', 'temp');
-    await fs.mkdir(tempPath, { recursive: true });
-    const imagePath = path.join(tempPath, `captcha_session_${company.pin}.png`);
-    await image.screenshot({ path: imagePath });
-
-    const worker = await createWorker('eng', 1);
-    let result;
-
-    const extractResult = async () => {
-        const ret = await worker.recognize(imagePath);
-        const text1 = ret.data.text.slice(0, -1);
-        const text = text1.slice(0, -1);
-        const numbers = text.match(/\d+/g);
-        if (!numbers || numbers.length < 2) throw new Error("Unable to extract valid numbers from CAPTCHA");
-        result = text.includes("+") ? Number(numbers[0]) + Number(numbers[1]) : Number(numbers[0]) - Number(numbers[1]);
-    };
-
-    let attempts = 0;
-    while (attempts < 5) {
-        try {
-            await extractResult();
-            break;
-        } catch (error) {
-            attempts++;
-            if (attempts >= 5) throw new Error('Failed to solve captcha after multiple attempts.');
-            await page.waitForTimeout(1000);
-            await image.screenshot({ path: imagePath });
-        }
-    }
-    await worker.terminate();
-
-    await page.type("#captcahText", result.toString());
-    await page.click("#loginButton");
-    await page.waitForTimeout(2000);
-
-    const mainMenu = await page.waitForSelector("#ddtopmenubar > ul > li:nth-child(1) > a", { timeout: 5000, state: "visible" }).catch(() => false);
-    if (mainMenu) {
-        progressCallback({ log: 'Session login successful!' });
-        return true;
-    }
-
-    throw new Error('Login failed to establish session.');
-}
 
 async function getDetailsFromAPI(pin, page, progressCallback) {
     try {
@@ -330,7 +319,124 @@ async function exportManufacturerToExcel(data, pin, downloadPath) {
     }
 }
 
-module.exports = {
-    fetchManufacturerDetails,
-    exportManufacturerToExcel
+// Export manufacturer details to a shared workbook as a sheet
+async function exportManufacturerToSheet(workbookManager, data) {
+    const worksheet = workbookManager.addWorksheet('Manufacturer Details');
+
+    // Add title
+    workbookManager.addTitleRow(worksheet, `MANUFACTURER DETAILS - ${workbookManager.company.pin}`, `Extracted on: ${new Date().toLocaleString()}`);
+    
+    // Add company info
+    workbookManager.addCompanyInfoRow(worksheet);
+
+    // Prepare data for export
+    const details = [
+        { category: 'Basic Information', field: 'PIN', value: workbookManager.company.pin },
+        { category: 'Basic Information', field: 'Manufacturer Name', value: data.timsManBasicRDtlDTO?.manufacturerName },
+        { category: 'Basic Information', field: 'Business Registration No.', value: data.timsManBasicRDtlDTO?.manufacturerBrNo },
+        
+        { category: 'Business Details', field: 'Business Name', value: data.manBusinessRDtlDTO?.businessName },
+        { category: 'Business Details', field: 'Business Registration Date', value: data.manBusinessRDtlDTO?.businessRegDate },
+        { category: 'Business Details', field: 'Business Commence Date', value: data.manBusinessRDtlDTO?.businessComDate },
+        
+        { category: 'Contact Information', field: 'Mobile Number', value: data.manContactRDtlDTO?.mobileNo },
+        { category: 'Contact Information', field: 'Main Email', value: data.manContactRDtlDTO?.mainEmail },
+        { category: 'Contact Information', field: 'Secondary Email', value: data.manContactRDtlDTO?.secondaryEmail },
+        
+        { category: 'Address Information', field: 'Building Number', value: data.manAddRDtlDTO?.buldgNo },
+        { category: 'Address Information', field: 'Street/Road', value: data.manAddRDtlDTO?.streetRoad },
+        { category: 'Address Information', field: 'City/Town', value: data.manAddRDtlDTO?.cityTown },
+        { category: 'Address Information', field: 'County', value: data.manAddRDtlDTO?.county },
+        { category: 'Address Information', field: 'District', value: data.manAddRDtlDTO?.district },
+        { category: 'Address Information', field: 'Tax Area Locality', value: data.manAddRDtlDTO?.taxAreaLocality },
+        { category: 'Address Information', field: 'Descriptive Address', value: data.manAddRDtlDTO?.descriptiveAddress?.replace(/\n/g, ', ') },
+        { category: 'Address Information', field: 'PO Box', value: data.manAddRDtlDTO?.poBox },
+        { category: 'Address Information', field: 'Postal Code', value: data.manAddRDtlDTO?.postalCode },
+        
+        { category: 'Additional Information', field: 'Disclaimer', value: data.manDisclaimerDtlDTO?.disclaimer }
+    ];
+
+    // Add headers
+    workbookManager.addHeaderRow(worksheet, ['Category', 'Field', 'Value']);
+
+    // Add data rows with category highlighting
+    let currentCategory = '';
+    const detailRows = details.map(detail => {
+        const row = [
+            detail.category !== currentCategory ? detail.category : '',
+            detail.field,
+            detail.value || 'N/A'
+        ];
+        
+        if (detail.category !== currentCategory) {
+            currentCategory = detail.category;
+        }
+        
+        return row;
+    });
+    
+    workbookManager.addDataRows(worksheet, detailRows, 'B', { borders: true, alternateRows: true });
+    
+    // Apply category highlighting
+    let rowIndex = 5; // Start after title, company info, and headers
+    currentCategory = '';
+    details.forEach(detail => {
+        if (detail.category !== currentCategory) {
+            currentCategory = detail.category;
+            const cell = worksheet.getCell(rowIndex, 2); // Column B
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFE6E6FA' }
+            };
+            cell.font = { bold: true };
+        }
+        rowIndex++;
+    });
+
+    workbookManager.autoFitColumns(worksheet, 15, 50);
+    
+    return worksheet;
+}
+
+// Export manufacturer details to consolidated workbook
+async function exportManufacturerToConsolidated(company, data, downloadPath, progressCallback) {
+    try {
+        progressCallback({ log: 'Initializing consolidated workbook...' });
+        
+        // Initialize shared workbook manager
+        const workbookManager = new SharedWorkbookManager(company, downloadPath);
+        const companyFolder = await workbookManager.initialize();
+        
+        progressCallback({ log: `Company folder: ${companyFolder}` });
+        progressCallback({ log: 'Adding manufacturer details to consolidated report...' });
+        
+        // Export to sheet
+        await exportManufacturerToSheet(workbookManager, data);
+        
+        // Save the workbook
+        const savedWorkbook = await workbookManager.save();
+        
+        progressCallback({ log: `Report saved: ${savedWorkbook.fileName}` });
+        
+        return {
+            success: true,
+            filePath: savedWorkbook.filePath,
+            fileName: savedWorkbook.fileName,
+            companyFolder: savedWorkbook.companyFolder
+        };
+    } catch (error) {
+        progressCallback({ log: `Error: ${error.message}`, logType: 'error' });
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+module.exports = { 
+    fetchManufacturerDetails, 
+    exportManufacturerToExcel, 
+    exportManufacturerToSheet,
+    exportManufacturerToConsolidated 
 };

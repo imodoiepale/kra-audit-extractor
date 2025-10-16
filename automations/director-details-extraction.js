@@ -2,6 +2,7 @@ const { chromium } = require('playwright');
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs').promises;
+const SharedWorkbookManager = require('./shared-workbook-manager');
 const { createWorker } = require('tesseract.js');
 const fetch = require('node-fetch');
 
@@ -27,7 +28,23 @@ async function runDirectorDetailsExtraction(company, downloadPath, progressCallb
 
         const extractedData = await extractCompanyAndDirectorDetails(page, progressCallback);
 
-        const filePath = await generateExcelReport(company, extractedData, downloadPath);
+        // Initialize shared workbook manager
+        const workbookManager = new SharedWorkbookManager(company, downloadPath);
+        const companyFolder = await workbookManager.initialize();
+
+        progressCallback({
+            progress: 80,
+            log: `Company folder created: ${companyFolder}`
+        });
+
+        // Export to shared workbook
+        await exportDirectorDetailsToSheet(workbookManager, extractedData);
+        const savedWorkbook = await workbookManager.save();
+
+        progressCallback({
+            progress: 90,
+            log: `Report saved: ${savedWorkbook.fileName}`
+        });
 
         await browser.close();
 
@@ -40,7 +57,7 @@ async function runDirectorDetailsExtraction(company, downloadPath, progressCallb
         return {
             success: true,
             message: 'Director details extracted successfully.',
-            files: [filePath],
+            files: [savedWorkbook.fileName],
             data: extractedData
         };
     } catch (error) {
@@ -350,4 +367,67 @@ async function getDirectorDetailsFromAPI(pin, page, progressCallback) {
     }
 }
 
-module.exports = { runDirectorDetailsExtraction };
+// Export director details to a shared workbook as a sheet
+async function exportDirectorDetailsToSheet(workbookManager, extractedData) {
+    const now = new Date();
+    const formattedDate = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
+    const worksheet = workbookManager.addWorksheet('Director Details');
+
+    // Add title
+    workbookManager.addTitleRow(worksheet, 'KRA Director Details Report', `Extraction Date: ${now.toLocaleString()}`);
+    
+    // Add company info
+    workbookManager.addCompanyInfoRow(worksheet);
+
+    // Add Accounting Period
+    const periodRow = worksheet.addRow(['', 'Accounting Period End Month', extractedData.accountingPeriod]);
+    worksheet.mergeCells(`C${periodRow.number}:E${periodRow.number}`);
+    workbookManager.highlightCells(worksheet, periodRow.number, 'B', 'E', 'FFE4EE99');
+    periodRow.getCell('B').font = { bold: true };
+    worksheet.addRow([]);
+
+    // Add Economic Activities Table
+    if (extractedData.activities && extractedData.activities.length > 0) {
+        const activityHeader = worksheet.addRow(['', 'Economic Activities']);
+        worksheet.mergeCells(`B${activityHeader.number}:E${activityHeader.number}`);
+        workbookManager.highlightCells(worksheet, activityHeader.number, 'B', 'E', 'FF90EE90');
+        activityHeader.getCell('B').font = { bold: true };
+
+        workbookManager.addHeaderRow(worksheet, ['No.', 'Section', 'Type']);
+
+        const activityData = extractedData.activities.map((act, index) => [
+            index + 1, act.section, act.type
+        ]);
+        workbookManager.addDataRows(worksheet, activityData, 'B', { borders: true, alternateRows: true });
+    } else {
+        worksheet.addRow(['', 'Economic Activities', 'No records found.']);
+    }
+    worksheet.addRow([]);
+
+    // Add director table
+    if (extractedData.directors && extractedData.directors.length > 0) {
+        const header = worksheet.addRow(['', 'Associated Directors / Partners']);
+        worksheet.mergeCells(`B${header.number}:H${header.number}`);
+        workbookManager.highlightCells(worksheet, header.number, 'B', 'H', 'FF90EE90');
+        header.getCell('B').font = { bold: true };
+
+        workbookManager.addHeaderRow(worksheet, ['No.', 'Nature', 'PIN', 'Name', 'Email', 'Mobile', 'Profit/Loss Ratio']);
+
+        const directorData = extractedData.directors.map((dir, index) => [
+            index + 1, dir.nature, dir.pin, dir.name, dir.email, dir.mobile, dir.ratio
+        ]);
+        workbookManager.addDataRows(worksheet, directorData, 'B', { borders: true, alternateRows: true });
+    } else {
+        worksheet.addRow(['', 'No director records found.']);
+    }
+
+    workbookManager.autoFitColumns(worksheet);
+    
+    return worksheet;
+}
+
+module.exports = { 
+    runDirectorDetailsExtraction,
+    extractCompanyAndDirectorDetails,
+    exportDirectorDetailsToSheet
+};

@@ -101,21 +101,23 @@ ipcMain.handle('fetch-manufacturer-details', async (event, { company }) => {
   }
 });
 
-// Export manufacturer details handler
-ipcMain.handle('export-manufacturer-details', async (event, { data, pin, downloadPath }) => {
+// Export manufacturer details handler (consolidated)
+ipcMain.handle('export-manufacturer-details', async (event, { company, data, downloadPath }) => {
   try {
-    const { exportManufacturerToExcel } = require('./automations/manufacturer-details');
-    return await exportManufacturerToExcel(data, pin, downloadPath);
+    const { exportManufacturerToConsolidated } = require('./automations/manufacturer-details');
+    return await exportManufacturerToConsolidated(company, data, downloadPath, (progress) => {
+      mainWindow.webContents.send('automation-progress', progress);
+    });
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-// Password validation handler
-ipcMain.handle('validate-kra-credentials', async (event, { pin, password, companyName }) => {
+// Password validation handler (consolidated)
+ipcMain.handle('validate-kra-credentials', async (event, { company, downloadPath }) => {
   try {
-    const { validateKRACredentials } = require('./automations/password-validation');
-    return await validateKRACredentials(pin, password, companyName, (progress) => {
+    const { validateAndExportToConsolidated } = require('./automations/password-validation');
+    return await validateAndExportToConsolidated(company, downloadPath, (progress) => {
       mainWindow.webContents.send('automation-progress', progress);
     });
   } catch (error) {
@@ -171,11 +173,11 @@ ipcMain.handle('run-all-automations', async (event, { company, selectedAutomatio
   }
 });
 
-// Obligation checker handler
-ipcMain.handle('run-obligation-check', async (event, { company }) => {
+// Obligation checker handler (consolidated)
+ipcMain.handle('run-obligation-check', async (event, { company, downloadPath }) => {
   try {
-    const { runObligationCheck } = require('./automations/obligation-checker');
-    return await runObligationCheck(company, (progress) => {
+    const { runObligationCheckConsolidated } = require('./automations/obligation-checker');
+    return await runObligationCheckConsolidated(company, downloadPath, (progress) => {
       mainWindow.webContents.send('automation-progress', progress);
     });
   } catch (error) {

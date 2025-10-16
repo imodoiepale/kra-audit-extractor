@@ -3,6 +3,7 @@ const { createWorker } = require('tesseract.js');
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs').promises;
+const SharedWorkbookManager = require('./shared-workbook-manager');
 
 async function runLedgerExtraction(company, downloadPath, progressCallback) {
     let browser = null;
@@ -14,6 +15,15 @@ async function runLedgerExtraction(company, downloadPath, progressCallback) {
             stage: 'General Ledger Extraction',
             message: 'Initializing ledger extraction...',
             progress: 0
+        });
+
+        // Initialize shared workbook manager
+        const workbookManager = new SharedWorkbookManager(company, downloadPath);
+        const companyFolder = await workbookManager.initialize();
+
+        progressCallback({
+            progress: 5,
+            log: `Company folder created: ${companyFolder}`
         });
 
         // Create download folder
@@ -67,7 +77,21 @@ async function runLedgerExtraction(company, downloadPath, progressCallback) {
         });
 
         // Extract ledger data
-        const extractedData = await extractLedgerData(page, company, ledgerDownloadPath, progressCallback);
+        const extractedData = await extractLedgerData(page, company, companyFolder, progressCallback);
+
+        progressCallback({
+            progress: 80,
+            log: 'Adding ledger data to consolidated report...'
+        });
+
+        // Export to shared workbook
+        await exportLedgerToSheet(workbookManager, extractedData);
+        const savedWorkbook = await workbookManager.save();
+
+        progressCallback({
+            progress: 90,
+            log: `Report saved: ${savedWorkbook.fileName}`
+        });
 
         progressCallback({
             progress: 100,
@@ -77,7 +101,7 @@ async function runLedgerExtraction(company, downloadPath, progressCallback) {
 
         return {
             success: true,
-            files: [extractedData.fileName],
+            files: [savedWorkbook.fileName],
             downloadPath: ledgerDownloadPath,
             recordCount: extractedData.recordCount,
             data: extractedData.data
@@ -423,6 +447,110 @@ function highlightCells(row, startCol, endCol, color, bold = false) {
     }
 }
 
+// Export ledger data to a shared workbook as a sheet
+async function exportLedgerToSheet(workbookManager, extractedData) {
+    const worksheet = workbookManager.addWorksheet('General Ledger');
+    
+    // Add title
+    workbookManager.addTitleRow(worksheet, `KRA GENERAL LEDGER - ${workbookManager.company.name}`, `Extraction Date: ${new Date().toLocaleDateString()}`);
+    
+    // Add company info
+    workbookManager.addCompanyInfoRow(worksheet);
+
+    if (!extractedData || !extractedData.data || extractedData.data.length === 0) {
+        worksheet.addRow(['', '', 'No general ledger records found']);
+    } else {
+        // Add header
+        const headers = [
+            '', '', 'Sr.No.', 'Tax Obligation', 'Tax Period', 'Transaction Date',
+            'Reference Number', 'Particulars', 'Transaction Type', 'Debit(Ksh)', 'Credit(Ksh)'
+        ];
+        const headerRow = worksheet.addRow(headers);
+        workbookManager.highlightCells(worksheet, headerRow.number, 'D', 'L', 'FFC0C0C0');
+        headerRow.getCell('D').font = { bold: true };
+        headerRow.getCell('E').font = { bold: true };
+        headerRow.getCell('F').font = { bold: true };
+        headerRow.getCell('G').font = { bold: true };
+        headerRow.getCell('H').font = { bold: true };
+        headerRow.getCell('I').font = { bold: true };
+        headerRow.getCell('J').font = { bold: true };
+        headerRow.getCell('K').font = { bold: true };
+        headerRow.getCell('L').font = { bold: true };
+
+        // Add data
+        extractedData.data.forEach((record, index) => {
+            const row = worksheet.addRow([
+                '', '',
+                record.srNo || '',
+                record.taxObligation || '',
+                record.taxPeriod || '',
+                record.transactionDate || '',
+                record.referenceNumber || '',
+                record.particulars || '',
+                record.transactionType || '',
+                record.debit || '',
+                record.credit || ''
+            ]);
+            
+            // Add borders to all data cells
+            row.eachCell((cell, colNumber) => {
+                if (colNumber > 2) {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                    cell.alignment = { vertical: 'middle', wrapText: true };
+                }
+            });
+            
+            // Alternate row coloring
+            if (index % 2 === 1) {
+                row.eachCell((cell, colNumber) => {
+                    if (colNumber > 2) {
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFF5F5F5' }
+                        };
+                    }
+                });
+            }
+            
+            // Format number columns
+            const debitCell = row.getCell('K');
+            const creditCell = row.getCell('L');
+            
+            if (record.debit && record.debit !== '-' && !isNaN(parseFloat(String(record.debit).replace(/,/g, '')))) {
+                debitCell.value = parseFloat(String(record.debit).replace(/,/g, ''));
+                debitCell.numFmt = '#,##0.00';
+                debitCell.alignment = { vertical: 'middle', horizontal: 'right' };
+            }
+            
+            if (record.credit && record.credit !== '-' && !isNaN(parseFloat(String(record.credit).replace(/,/g, '')))) {
+                creditCell.value = parseFloat(String(record.credit).replace(/,/g, ''));
+                creditCell.numFmt = '#,##0.00';
+                creditCell.alignment = { vertical: 'middle', horizontal: 'right' };
+            }
+        });
+    }
+
+    // Set column widths
+    worksheet.getColumn('D').width = 8;  // Sr.No.
+    worksheet.getColumn('E').width = 25; // Tax Obligation
+    worksheet.getColumn('F').width = 15; // Tax Period
+    worksheet.getColumn('G').width = 15; // Transaction Date
+    worksheet.getColumn('H').width = 20; // Reference Number
+    worksheet.getColumn('I').width = 40; // Particulars
+    worksheet.getColumn('J').width = 18; // Transaction Type
+    worksheet.getColumn('K').width = 15; // Debit
+    worksheet.getColumn('L').width = 15; // Credit
+    
+    return worksheet;
+}
+
 module.exports = {
-    runLedgerExtraction
+    runLedgerExtraction,
+    exportLedgerToSheet
 };

@@ -401,7 +401,115 @@ async function runPasswordValidation(company, progressCallback) {
     }
 }
 
+// Export password validation to a shared workbook as a sheet
+async function exportPasswordValidationToSheet(workbookManager, validationResult) {
+    const worksheet = workbookManager.addWorksheet('Password Validation');
+    
+    // Add title
+    workbookManager.addTitleRow(worksheet, 'KRA Password Validation Report', `Validation Time: ${new Date().toLocaleString()}`);
+    
+    // Add company info
+    workbookManager.addCompanyInfoRow(worksheet);
+
+    // Add headers
+    workbookManager.addHeaderRow(worksheet, ['Status', 'Details']);
+
+    // Add data row
+    const status = validationResult.success ? validationResult.status : 'Error';
+    const details = validationResult.success ? validationResult.message : validationResult.error;
+    
+    const dataRow = worksheet.addRow(['', status, details]);
+    
+    // Color code based on status
+    const statusCell = dataRow.getCell('B');
+    const detailsCell = dataRow.getCell('C');
+    
+    let fillColor;
+    if (validationResult.success && validationResult.status === "Valid") {
+        fillColor = "FF99FF99"; // Light Green
+    } else if (validationResult.success && validationResult.status === "Invalid") {
+        fillColor = "FFFF9999"; // Light Red
+    } else if (validationResult.success && validationResult.status === "Password Expired") {
+        fillColor = "FFFFCC00"; // Orange
+    } else {
+        fillColor = "FFFFE066"; // Light Yellow
+    }
+
+    [statusCell, detailsCell].forEach(cell => {
+        cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: fillColor }
+        };
+        cell.border = {
+            top: { style: 'medium' },
+            left: { style: 'medium' },
+            bottom: { style: 'medium' },
+            right: { style: 'medium' }
+        };
+        cell.alignment = { vertical: 'middle', wrapText: true };
+        cell.font = { size: 11 };
+    });
+    
+    // Add spacing after data
+    worksheet.addRow([]);
+
+    workbookManager.autoFitColumns(worksheet);
+    
+    return worksheet;
+}
+
+// Validate and export to consolidated workbook
+async function validateAndExportToConsolidated(company, downloadPath, progressCallback) {
+    try {
+        progressCallback({ log: 'Initializing consolidated workbook...' });
+        
+        // Initialize shared workbook manager
+        const SharedWorkbookManager = require('./shared-workbook-manager');
+        const workbookManager = new SharedWorkbookManager(company, downloadPath);
+        const companyFolder = await workbookManager.initialize();
+        
+        progressCallback({ log: `Company folder: ${companyFolder}` });
+        progressCallback({ log: 'Validating credentials...' });
+        
+        // Validate credentials
+        const validationResult = await validateKRACredentials(
+            company.pin, 
+            company.password, 
+            company.name, 
+            progressCallback
+        );
+        
+        progressCallback({ log: 'Adding validation result to consolidated report...' });
+        
+        // Export to sheet
+        await exportPasswordValidationToSheet(workbookManager, validationResult);
+        
+        // Save the workbook
+        const savedWorkbook = await workbookManager.save();
+        
+        progressCallback({ log: `Report saved: ${savedWorkbook.fileName}` });
+        
+        return {
+            success: validationResult.success,
+            status: validationResult.status,
+            message: validationResult.message,
+            filePath: savedWorkbook.filePath,
+            fileName: savedWorkbook.fileName,
+            companyFolder: savedWorkbook.companyFolder
+        };
+    } catch (error) {
+        progressCallback({ log: `Error: ${error.message}`, logType: 'error' });
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
 module.exports = {
     validateKRACredentials,
-    runPasswordValidation
+    runPasswordValidation,
+    exportPasswordValidationToSheet,
+    validateAndExportToConsolidated
 };

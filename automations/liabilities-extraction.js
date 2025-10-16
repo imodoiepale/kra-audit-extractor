@@ -4,6 +4,7 @@ const path = require("path");
 const os = require("os");
 const ExcelJS = require("exceljs");
 const { createWorker } = require('tesseract.js');
+const SharedWorkbookManager = require('./shared-workbook-manager');
 
 // Constants and date formatting
 const now = new Date();
@@ -171,15 +172,13 @@ async function discoverAllTaxTypes(page, progressCallback) {
 
 // Enhanced function to run both liabilities extraction methods
 async function runLiabilitiesExtraction(company, downloadPath, progressCallback) {
-    // Create a company-specific subfolder within the user-selected download path
-    const safeCompanyName = company.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const subfolderName = `${safeCompanyName}_${company.pin}`;
-    const downloadFolderPath = path.join(downloadPath, subfolderName);
-    await fs.mkdir(downloadFolderPath, { recursive: true });
+    // Initialize shared workbook manager
+    const workbookManager = new SharedWorkbookManager(company, downloadPath);
+    const downloadFolderPath = await workbookManager.initialize();
 
     progressCallback({ 
         stage: 'Liabilities', 
-        message: 'Starting enhanced liabilities extraction (both methods)...', 
+        message: `Starting liabilities extraction...\nCompany folder: ${downloadFolderPath}`, 
         progress: 5 
     });
 
@@ -211,26 +210,34 @@ async function runLiabilitiesExtraction(company, downloadPath, progressCallback)
         });
         const method2Results = await runMethod2_PaymentRegistration(page, company, downloadFolderPath, progressCallback);
 
-        // Combine results
+        // Combine results and add to workbook
         progressCallback({ 
             stage: 'Liabilities', 
-            message: 'Combining results from both methods...', 
-            progress: 90 
+            message: 'Adding liabilities data to consolidated report...', 
+            progress: 80 
         });
-        const combinedResults = await combineMethodResults(method1Results, method2Results, company, downloadFolderPath, progressCallback);
+        const combinedResults = await combineMethodResults(method1Results, method2Results, company, workbookManager, progressCallback);
+        
+        // Save the workbook
+        const savedWorkbook = await workbookManager.save();
+        
+        progressCallback({ 
+            progress: 95,
+            log: `Report saved: ${savedWorkbook.fileName}`
+        });
 
         await browser.close();
 
         progressCallback({ 
             stage: 'Liabilities', 
-            message: 'Enhanced liabilities extraction completed successfully.', 
+            message: 'Liabilities extraction completed successfully.', 
             progress: 100 
         });
         
         return { 
             success: true, 
             message: 'Liabilities extracted successfully using both methods.', 
-            files: combinedResults.files, 
+            files: [savedWorkbook.fileName], 
             downloadPath: downloadFolderPath,
             data: combinedResults.data,
             totalAmount: combinedResults.totalAmount,
@@ -814,12 +821,11 @@ async function processPaymentRegistrationTax(page, company, taxHead, taxSubHead,
     };
 }
 
-// Combine results from both methods
-async function combineMethodResults(method1Results, method2Results, company, downloadFolderPath, progressCallback) {
-    progressCallback({ log: 'Combining results from both methods...' });
+// Combine results from both methods and add to shared workbook
+async function combineMethodResults(method1Results, method2Results, company, workbookManager, progressCallback) {
+    progressCallback({ log: 'Adding liabilities data to consolidated report...' });
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(`ENHANCED-LIABILITIES-${formattedDateTime}`);
+    const worksheet = workbookManager.addWorksheet('Liabilities');
 
     // Add title row with company name prominently displayed
     const titleRow = worksheet.addRow([
@@ -1015,38 +1021,14 @@ async function combineMethodResults(method1Results, method2Results, company, dow
 
     // No Grand Total - each method has its own totals
 
-    // Auto-fit columns and save
-    autoFitColumns(worksheet);
-    const filePath = path.join(downloadFolderPath, `ENHANCED-LIABILITIES-${company.name}-${formattedDateTime}.xlsx`);
-    await workbook.xlsx.writeFile(filePath);
-
-    // Save detailed JSON data
-    const jsonData = {
-        company: {
-            name: company.name,
-            pin: company.pin
-        },
-        extractionDate: formattedDateTime,
-        methods: {
-            method1_VATRefund: method1Results,
-            method2_PaymentRegistration: method2Results
-        },
-        combined: {
-            totalRecords: allData.length,
-            totalAmount: totalAmount,
-            data: allData
-        }
-    };
-
-    const jsonFilePath = path.join(downloadFolderPath, `ENHANCED-LIABILITIES-${company.name}-${formattedDateTime}.json`);
-    await fs.writeFile(jsonFilePath, JSON.stringify(jsonData, null, 2), 'utf8');
+    // Auto-fit columns
+    workbookManager.autoFitColumns(worksheet);
 
     progressCallback({ 
-        log: `Enhanced extraction completed. Files saved: Excel and JSON` 
+        log: `Liabilities data added to consolidated report` 
     });
 
     return {
-        files: [filePath, jsonFilePath],
         data: allData,
         totalAmount: totalAmount,
         recordCount: allData.length

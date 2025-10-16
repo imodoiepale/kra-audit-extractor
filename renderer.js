@@ -242,6 +242,27 @@ function switchTab(tabId) {
         'all-automations': 10
     };
     appState.currentStep = stepMap[tabId] || 1;
+    
+    // Update displays when switching tabs
+    if (tabId === 'password-validation' && appState.companyData) {
+        // Update validation tab with company info
+        if (elements.validationCompanyName) {
+            elements.validationCompanyName.textContent = appState.companyData.name || '-';
+        }
+        if (elements.validationPIN) {
+            elements.validationPIN.textContent = appState.companyData.pin || '-';
+        }
+        if (appState.validationStatus) {
+            updateValidationDisplay({ status: appState.validationStatus });
+        }
+    }
+    
+    if (tabId === 'manufacturer-details' && appState.companyData) {
+        // Show company info on manufacturer details tab
+        if (appState.manufacturerData) {
+            displayManufacturerDetails(appState.manufacturerData);
+        }
+    }
 }
 
 // Set default download path
@@ -326,9 +347,8 @@ function updateUIState() {
 
     const detailsTab = document.querySelector('[data-tab="manufacturer-details"]');
     if (detailsTab) {
-        if (appState.manufacturerDetails) {
+        if (appState.manufacturerData) {
             detailsTab.classList.add('completed');
-            displayManufacturerDetails(appState.manufacturerDetails);
         } else {
             detailsTab.classList.remove('completed');
         }
@@ -471,16 +491,18 @@ async function fetchCompanyDetails() {
             // Reset related state when fetching new company details
             appState.validationStatus = null;
             appState.hasValidation = false; // Reset validation status
-            appState.manufacturerData = null;
             appState.obligationData = null; // Reset obligation data
             appState.liabilitiesData = null; // Reset liabilities data
             appState.vatData = null; // Reset VAT data
             appState.ledgerData = null; // Reset ledger data
             appState.tccData = null; // Reset TCC data
             updateValidationDisplay({ status: 'Not Validated' });
-            if (elements.manufacturerInfo) elements.manufacturerInfo.innerHTML = ''; // Clear previous manufacturer details
 
             const data = result.data;
+            
+            // Save manufacturer data for Tab 3
+            appState.manufacturerData = data;
+            
             appState.companyData = {
                 pin: pin,
                 password: elements.kraPassword?.value.trim(),
@@ -496,12 +518,29 @@ async function fetchCompanyDetails() {
             if (elements.companyDetailsResult) {
                 elements.companyDetailsResult.classList.remove('hidden');
             }
+            
+            // Automatically export manufacturer details to Excel
+            if (elements.progressText) {
+                elements.progressText.textContent = 'Exporting manufacturer details to Excel...';
+            }
+            const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+            
+            const exportResult = await ipcRenderer.invoke('export-manufacturer-details', {
+                company: appState.companyData,
+                data: appState.manufacturerData,
+                downloadPath: downloadPath
+            });
+            
+            if (exportResult.success && elements.progressText) {
+                elements.progressText.textContent = `Saved to: ${exportResult.fileName || 'Consolidated Report'}`;
+            }
+            
             hideProgressSection();
 
             await showMessage({
                 type: 'info',
                 title: 'Success',
-                message: 'Company details fetched successfully!'
+                message: `Company details fetched and saved successfully!\nFile: ${exportResult.fileName || 'Consolidated Report'}`
             });
         } else {
             throw new Error(result.error || 'Failed to fetch company details');
@@ -572,10 +611,11 @@ async function validateCredentials() {
         updateUIState();
         showProgressSection('Validating KRA credentials...');
 
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+        
         const result = await ipcRenderer.invoke('validate-kra-credentials', {
-            pin: appState.companyData.pin,
-            password: appState.companyData.password,
-            companyName: appState.companyData.name
+            company: appState.companyData,
+            downloadPath: downloadPath
         });
 
         if (result.success) {
@@ -623,7 +663,6 @@ function updateValidationDisplay(result) {
 
 // Display manufacturer details
 function displayManufacturerDetails(data) {
-    appState.manufacturerDetails = data; // Save details to app state
     if (!elements.manufacturerInfo) return;
 
     const basic = data.timsManBasicRDtlDTO || {};
@@ -854,7 +893,7 @@ async function fetchManufacturerDetails() {
         showProgressSection('Fetching manufacturer details...');
         
         const result = await ipcRenderer.invoke('fetch-manufacturer-details', {
-            pin: appState.companyData.pin
+            company: appState.companyData
         });
         
         if (result.success && result.data) {
@@ -902,9 +941,12 @@ async function exportManufacturerDetails() {
         updateUIState();
         showProgressSection('Exporting manufacturer details...');
         
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+        
         const result = await ipcRenderer.invoke('export-manufacturer-details', {
+            company: appState.companyData,
             data: appState.manufacturerData,
-            companyName: appState.companyData?.name || 'Unknown'
+            downloadPath: downloadPath
         });
         
         if (result.success) {
@@ -1067,12 +1109,15 @@ async function runObligationCheck() {
         updateUIState();
         showProgressSection('Running obligation check...');
         
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+        
         const result = await ipcRenderer.invoke('run-obligation-check', {
             company: {
                 pin: pin,
                 password: password,
                 name: companyName
-            }
+            },
+            downloadPath: downloadPath
         });
         
         if (result.success) {

@@ -5,8 +5,15 @@ const os = require("os");
 const ExcelJS = require("exceljs");
 const { createWorker } = require('tesseract.js');
 
+// Import shared workbook manager
+const SharedWorkbookManager = require('./shared-workbook-manager');
+
 // Import utility functions from individual automations
-const { fetchManufacturerDetails, exportManufacturerToExcel } = require('./manufacturer-details');
+const { fetchManufacturerDetails, exportManufacturerToSheet } = require('./manufacturer-details');
+const { extractCompanyAndDirectorDetails, exportDirectorDetailsToSheet } = require('./director-details-extraction');
+const { exportLedgerToSheet } = require('./ledger-extraction');
+const { exportObligationToSheet } = require('./obligation-checker');
+const { exportPasswordValidationToSheet } = require('./password-validation');
 
 async function runAllAutomationsOptimized(company, selectedAutomations, dateRange, downloadPath, progressCallback) {
     const results = {};
@@ -21,6 +28,7 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
     if (selectedAutomations.liabilities) totalSteps++;
     if (selectedAutomations.vatReturns) totalSteps++;
     if (selectedAutomations.generalLedger) totalSteps++;
+    if (selectedAutomations.directorDetails) totalSteps++;
 
     if (totalSteps === 0) {
         return { success: false, error: 'No automations selected' };
@@ -28,6 +36,7 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
 
     let browser = null;
     let page = null;
+    let workbookManager = null;
 
     try {
         progressCallback({
@@ -36,16 +45,13 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
             progress: 0
         });
 
-        // Create main download folder
-        const now = new Date();
-        const formattedDateTime = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
-        const safeCompanyName = company.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        const mainDownloadPath = path.join(downloadPath, `${safeCompanyName}_${company.pin}_ALL_AUTOMATIONS_${formattedDateTime}`);
-        await fs.mkdir(mainDownloadPath, { recursive: true });
+        // Initialize shared workbook manager
+        workbookManager = new SharedWorkbookManager(company, downloadPath);
+        const mainDownloadPath = await workbookManager.initialize();
 
         progressCallback({
             progress: 5,
-            log: `Main download folder created: ${mainDownloadPath}`
+            log: `Company folder created: ${mainDownloadPath}`
         });
 
         // Initialize browser and login once
@@ -76,14 +82,24 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
             try {
                 progressCallback({
                     message: `Running automation ${completedSteps + 1}/${totalSteps}: Password Validation`,
-                    log: 'Starting password validation...'
+                    log: 'Recording password validation status...'
                 });
 
-                const passwordResult = await runPasswordValidationOptimized(page, company, mainDownloadPath, progressCallback);
-                results.passwordValidation = passwordResult;
-                if (passwordResult.success && passwordResult.files) {
-                    allFiles.push(...passwordResult.files);
-                }
+                // Since we already logged in successfully, just record that
+                const validationResult = {
+                    success: true,
+                    status: 'Valid',
+                    message: 'Login successful (validated during session login)'
+                };
+                results.passwordValidation = validationResult;
+                
+                await exportPasswordValidationToSheet(workbookManager, validationResult);
+                progressCallback({ log: 'Password validation added to consolidated report' });
+                
+                // Save workbook after this automation
+                await workbookManager.save();
+                progressCallback({ log: 'Consolidated report updated and saved' });
+                
                 completedSteps++;
             } catch (error) {
                 progressCallback({
@@ -102,13 +118,15 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
                 });
 
                 // Use existing API call (doesn't need browser session)
-                const manufacturerResult = await fetchManufacturerDetails(company.pin, progressCallback);
+                const manufacturerResult = await fetchManufacturerDetails(company, progressCallback);
                 if (manufacturerResult.success) {
-                    const exportResult = await exportManufacturerToExcel(manufacturerResult.data, company.pin, mainDownloadPath);
-                    if (exportResult.success) {
-                        results.manufacturerDetails = { data: manufacturerResult.data, exportFile: exportResult.fileName };
-                        allFiles.push(exportResult.fileName);
-                    }
+                    await exportManufacturerToSheet(workbookManager, manufacturerResult.data);
+                    results.manufacturerDetails = { data: manufacturerResult.data };
+                    progressCallback({ log: 'Manufacturer details added to consolidated report' });
+                    
+                    // Save workbook after this automation
+                    await workbookManager.save();
+                    progressCallback({ log: 'Consolidated report updated and saved' });
                 }
                 completedSteps++;
             } catch (error) {
@@ -129,8 +147,14 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
 
                 const obligationResult = await runObligationCheckOptimized(page, company, mainDownloadPath, progressCallback);
                 results.obligationCheck = obligationResult;
-                if (obligationResult.success && obligationResult.files) {
-                    allFiles.push(...obligationResult.files);
+                
+                if (obligationResult.success && obligationResult.data) {
+                    await exportObligationToSheet(workbookManager, obligationResult.data);
+                    progressCallback({ log: 'Obligation check added to consolidated report' });
+                    
+                    // Save workbook after this automation
+                    await workbookManager.save();
+                    progressCallback({ log: 'Consolidated report updated and saved' });
                 }
                 completedSteps++;
             } catch (error) {
@@ -149,11 +173,13 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
                     log: 'Starting liabilities extraction...'
                 });
 
-                const liabilitiesResult = await runLiabilitiesExtractionOptimized(page, company, mainDownloadPath, progressCallback);
+                const liabilitiesResult = await runLiabilitiesExtractionOptimized(page, company, workbookManager, progressCallback);
                 results.liabilities = liabilitiesResult;
-                if (liabilitiesResult.success && liabilitiesResult.files) {
-                    allFiles.push(...liabilitiesResult.files);
-                }
+                
+                // Save workbook after this automation
+                await workbookManager.save();
+                progressCallback({ log: 'Consolidated report updated and saved' });
+                
                 completedSteps++;
             } catch (error) {
                 progressCallback({
@@ -163,7 +189,7 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
             }
         }
 
-        // Run VAT Returns (if selected)
+        // Run VAT Returns (if selected) - Keep separate as it downloads sales and purchase
         if (selectedAutomations.vatReturns) {
             try {
                 progressCallback({
@@ -193,11 +219,13 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
                     log: 'Starting general ledger extraction...'
                 });
 
-                const ledgerResult = await runLedgerExtractionOptimized(page, company, mainDownloadPath, progressCallback);
+                const ledgerResult = await runLedgerExtractionOptimized(page, company, workbookManager, progressCallback);
                 results.generalLedger = ledgerResult;
-                if (ledgerResult.success && ledgerResult.files) {
-                    allFiles.push(...ledgerResult.files);
-                }
+                
+                // Save workbook after this automation
+                await workbookManager.save();
+                progressCallback({ log: 'Consolidated report updated and saved' });
+                
                 completedSteps++;
             } catch (error) {
                 progressCallback({
@@ -207,9 +235,36 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
             }
         }
 
+        // Run Director Details (if selected)
+        if (selectedAutomations.directorDetails) {
+            try {
+                progressCallback({
+                    message: `Running automation ${completedSteps + 1}/${totalSteps}: Director Details`,
+                    log: 'Starting director details extraction...'
+                });
+
+                const directorResult = await extractCompanyAndDirectorDetails(page, progressCallback);
+                if (directorResult) {
+                    await exportDirectorDetailsToSheet(workbookManager, directorResult);
+                    results.directorDetails = { data: directorResult };
+                    progressCallback({ log: 'Director details added to consolidated report' });
+                    
+                    // Save workbook after this automation
+                    await workbookManager.save();
+                    progressCallback({ log: 'Consolidated report updated and saved' });
+                }
+                completedSteps++;
+            } catch (error) {
+                progressCallback({
+                    log: `Error in director details: ${error.message}`,
+                    logType: 'error'
+                });
+            }
+        }
+
         // Logout once at the end
         progressCallback({
-            progress: 95,
+            progress: 90,
             log: 'Logging out...'
         });
 
@@ -218,14 +273,19 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
         });
         await page.waitForLoadState("load");
 
-        // Create comprehensive summary report
+        // Final save of the consolidated workbook
         progressCallback({
-            progress: 98,
-            log: 'Creating comprehensive summary report...'
+            progress: 95,
+            log: 'Finalizing consolidated report...'
         });
 
-        const summaryFile = await createComprehensiveSummary(company, results, selectedAutomations, mainDownloadPath);
-        allFiles.push(summaryFile);
+        const savedWorkbook = await workbookManager.save();
+        allFiles.push(savedWorkbook.fileName);
+
+        progressCallback({
+            progress: 98,
+            log: `All automations completed. Final report: ${savedWorkbook.fileName}`
+        });
 
         progressCallback({
             progress: 100,
@@ -238,9 +298,10 @@ async function runAllAutomationsOptimized(company, selectedAutomations, dateRang
             results: results,
             files: allFiles,
             downloadPath: mainDownloadPath,
+            consolidatedReport: savedWorkbook.fileName,
             completedSteps: completedSteps,
             totalSteps: totalSteps,
-            message: `Successfully completed ${completedSteps}/${totalSteps} automations`
+            message: `Successfully completed ${completedSteps}/${totalSteps} automations. Consolidated report: ${savedWorkbook.fileName}`
         };
 
     } catch (error) {
@@ -290,17 +351,27 @@ async function loginToKRA(page, company, progressCallback) {
 
     const extractResult = async () => {
         const ret = await worker.recognize(imagePath);
-        const text = ret.data.text.replace(/\n/g, '').replace(/ /g, '');
+        
+        // Use the same proven method as password validation and obligation checker
+        const text1 = ret.data.text.slice(0, -1);
+        const text = text1.slice(0, -1);
         const numbers = text.match(/\d+/g);
-        if (!numbers || numbers.length < 2) throw new Error("Unable to extract valid numbers from captcha.");
 
-        if (text.includes('+')) {
+        if (!numbers || numbers.length < 2) {
+            throw new Error("Unable to extract valid numbers from CAPTCHA");
+        }
+
+        if (text.includes("+")) {
             result = Number(numbers[0]) + Number(numbers[1]);
-        } else if (text.includes('-')) {
+        } else if (text.includes("-")) {
             result = Number(numbers[0]) - Number(numbers[1]);
         } else {
-            throw new Error("Unsupported captcha operator.");
+            throw new Error("Unsupported arithmetic operator in CAPTCHA");
         }
+        
+        progressCallback({
+            log: `CAPTCHA solved: ${numbers[0]} ${text.includes("+") ? "+" : "-"} ${numbers[1]} = ${result}`
+        });
     };
 
     let attempts = 0;
@@ -319,25 +390,39 @@ async function loginToKRA(page, company, progressCallback) {
 
     await page.type("#captcahText", result.toString());
     await page.click("#loginButton");
+    
+    // Wait a bit for the page to process
+    await page.waitForTimeout(2000);
 
-    const mainMenu = await page.waitForSelector("#ddtopmenubar > ul > li:nth-child(1) > a", { timeout: 10000, state: "visible" }).catch(() => false);
-    if (mainMenu) return true;
+    // Check if login was successful (look for main menu)
+    const mainMenu = await page.waitForSelector("#ddtopmenubar > ul > li:nth-child(1) > a", { 
+        timeout: 5000, 
+        state: "visible" 
+    }).catch(() => false);
 
-    const isInvalidLogin = await page.waitForSelector('b:has-text("Wrong result of the arithmetic operation.")', { state: 'visible', timeout: 3000 }).catch(() => false);
+    if (mainMenu) {
+        progressCallback({ log: 'Login successful!' });
+        return true;
+    }
+
+    // Check if there's an invalid login message
+    const isInvalidLogin = await page.waitForSelector('b:has-text("Wrong result of the arithmetic operation.")', { 
+        state: 'visible', 
+        timeout: 3000 
+    }).catch(() => false);
+
     if (isInvalidLogin) {
         progressCallback({ log: 'Wrong captcha result, retrying login...' });
         return loginToKRA(page, company, progressCallback);
     }
 
-    return false;
+    // If no main menu and no invalid login message, something else went wrong
+    progressCallback({ log: 'Login failed - unknown error, retrying...' });
+    return loginToKRA(page, company, progressCallback);
 }
 
 // Optimized automation functions (using existing browser session)
-async function runPasswordValidationOptimized(page, company, downloadPath, progressCallback) {
-    // Implementation for password validation using existing page session
-    progressCallback({ log: 'Password validation completed (using existing session)' });
-    return { success: true, files: [], message: 'Password validation completed' };
-}
+// Password validation is handled during initial login - no separate function needed
 
 async function runObligationCheckOptimized(page, company, downloadPath, progressCallback) {
     // Navigate to PIN checker
@@ -382,7 +467,7 @@ async function runObligationCheckOptimized(page, company, downloadPath, progress
     return { success: true, files: [], data: { tableContent }, message: 'Obligation check completed' };
 }
 
-async function runLiabilitiesExtractionOptimized(page, company, downloadPath, progressCallback) {
+async function runLiabilitiesExtractionOptimized(page, company, workbookManager, progressCallback) {
     // Navigate to Payment Registration form
     await page.hover("#ddtopmenubar > ul > li:nth-child(6) > a");
     await page.evaluate(() => { showPaymentRegForm(); });
@@ -393,30 +478,23 @@ async function runLiabilitiesExtractionOptimized(page, company, downloadPath, pr
     await page.click("#openPayRegForm");
     page.once("dialog", dialog => { dialog.accept().catch(() => {}); });
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(`Liabilities - ${company.pin}`);
+    // Add worksheet to shared workbook
+    const worksheet = workbookManager.addWorksheet('Liabilities');
+    
+    // Add title
+    workbookManager.addTitleRow(worksheet, `KRA LIABILITIES - ${company.name}`, `Extraction Date: ${new Date().toLocaleDateString()}`);
+    workbookManager.addCompanyInfoRow(worksheet);
     
     // Extract liabilities for different tax types
     await extractLiability(page, worksheet, 'IT', '4', 'Income Tax - Company');
     await extractLiability(page, worksheet, 'VAT', '9', 'VAT');
     await extractLiability(page, worksheet, 'IT', '7', 'PAYE');
 
-    // Auto-fit columns and save
-    worksheet.columns.forEach(column => {
-        let maxLength = 0;
-        column.eachCell({ includeEmpty: true }, cell => {
-            let cellLength = cell.value ? cell.value.toString().length : 0;
-            if (cellLength > maxLength) maxLength = cellLength;
-        });
-        column.width = Math.min(50, Math.max(10, maxLength + 2));
-    });
+    // Auto-fit columns
+    workbookManager.autoFitColumns(worksheet);
 
-    const fileName = `Liabilities_${company.pin}_${Date.now()}.xlsx`;
-    const filePath = path.join(downloadPath, fileName);
-    await workbook.xlsx.writeFile(filePath);
-
-    progressCallback({ log: 'Liabilities extraction completed (using existing session)' });
-    return { success: true, files: [fileName], filePath, message: 'Liabilities extraction completed' };
+    progressCallback({ log: 'Liabilities added to consolidated report' });
+    return { success: true, message: 'Liabilities extraction completed' };
 }
 
 async function extractLiability(page, worksheet, taxHead, taxSubHead, sectionTitle) {
@@ -453,9 +531,33 @@ async function extractLiability(page, worksheet, taxHead, taxSubHead, sectionTit
     const headersRow = worksheet.addRow(headers.slice(1));
     headersRow.font = { bold: true };
 
-    // Add data
-    tableContent.slice(1).forEach(row => {
-        worksheet.addRow(row.slice(1));
+    // Add data with borders and formatting
+    tableContent.slice(1).forEach((row, index) => {
+        const dataRow = worksheet.addRow(row.slice(1));
+        
+        // Add borders to all cells
+        dataRow.eachCell((cell, colNumber) => {
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+            cell.alignment = { vertical: 'middle', wrapText: true };
+        });
+        
+        // Alternate row coloring
+        if (index % 2 === 1) {
+            dataRow.eachCell((cell) => {
+                if (!cell.fill || !cell.fill.fgColor) {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFF5F5F5' }
+                    };
+                }
+            });
+        }
     });
 
     worksheet.addRow([]); // Empty row for spacing
@@ -467,10 +569,86 @@ async function runVATExtractionOptimized(page, company, dateRange, downloadPath,
     return { success: true, files: [], message: 'VAT extraction completed' };
 }
 
-async function runLedgerExtractionOptimized(page, company, downloadPath, progressCallback) {
-    // Implementation for ledger extraction using existing page session
-    progressCallback({ log: 'Ledger extraction completed (using existing session)' });
-    return { success: true, files: [], message: 'Ledger extraction completed' };
+async function runLedgerExtractionOptimized(page, company, workbookManager, progressCallback) {
+    try {
+        progressCallback({ log: 'Navigating to general ledger section...' });
+        
+        // Navigate to General Ledger
+        const menuItemsSelector = [
+            "#ddtopmenubar > ul > li:nth-child(12) > a",
+            "#ddtopmenubar > ul > li:nth-child(11) > a"
+        ];
+        
+        let dynamicElementFound = false;
+        for (const selector of menuItemsSelector) {
+            if (dynamicElementFound) break;
+            await page.reload();
+            const menuItem = await page.$(selector);
+            if (menuItem) {
+                const bbox = await menuItem.boundingBox();
+                if (bbox) {
+                    const x = bbox.x + bbox.width / 2;
+                    const y = bbox.y + bbox.height / 2;
+                    await page.mouse.move(x, y);
+                    dynamicElementFound = await page.waitForSelector("#My\\ Ledger", { timeout: 1000 })
+                        .then(() => true).catch(() => false);
+                }
+            }
+        }
+
+        if (!dynamicElementFound) {
+            throw new Error("Could not find General Ledger menu");
+        }
+
+        await page.evaluate(() => { showGeneralLedgerForm(); });
+        progressCallback({ log: 'General ledger form loaded' });
+
+        // Configure General Ledger
+        await page.click("#cmbTaxType");
+        await page.locator("#cmbTaxType").selectOption("ALL", { timeout: 1000 });
+        await page.click("#cmdShowLedger");
+        await page.click("#chngroup");
+        await page.locator("#chngroup").selectOption("Tax Obligation");
+        await page.waitForLoadState("load");
+        await page.waitForTimeout(2000);
+
+        // Extract ledger data
+        const ledgerTable = await page.locator("#gridGeneralLedgerDtlsTbl").first();
+        let extractedData = [];
+        
+        if (ledgerTable) {
+            const tableContent = await ledgerTable.evaluate(table => {
+                const rows = Array.from(table.querySelectorAll("tr"));
+                return rows.map(row => {
+                    const cells = Array.from(row.querySelectorAll("td"));
+                    return cells.map(cell => cell.innerText.trim());
+                });
+            });
+
+            if (tableContent.length > 1) {
+                extractedData = tableContent.filter(row => row.some(cell => cell.trim() !== "")).map(row => ({
+                    srNo: row[0] || '',
+                    taxObligation: row[1] || '',
+                    taxPeriod: row[2] || '',
+                    transactionDate: row[3] || '',
+                    referenceNumber: row[4] || '',
+                    particulars: row[5] || '',
+                    transactionType: row[6] || '',
+                    debit: row[7] || '',
+                    credit: row[8] || ''
+                }));
+            }
+        }
+
+        // Export to shared workbook
+        await exportLedgerToSheet(workbookManager, { data: extractedData });
+        
+        progressCallback({ log: 'General ledger added to consolidated report' });
+        return { success: true, data: extractedData, message: 'Ledger extraction completed' };
+    } catch (error) {
+        progressCallback({ log: `Ledger extraction error: ${error.message}`, logType: 'warning' });
+        return { success: false, error: error.message };
+    }
 }
 
 // Summary report function (same as original)

@@ -164,4 +164,116 @@ function organizeData(companyName, tableContent) {
     return data;
 }
 
-module.exports = { runObligationCheck };
+// Export obligation check data to a shared workbook as a sheet
+async function exportObligationToSheet(workbookManager, obligationData) {
+    const worksheet = workbookManager.addWorksheet('Obligation Check');
+    
+    // Add title
+    workbookManager.addTitleRow(worksheet, 'KRA Obligation Check Report', `Extraction Date: ${new Date().toLocaleDateString()}`);
+    
+    // Add company info
+    workbookManager.addCompanyInfoRow(worksheet);
+
+    if (obligationData.error) {
+        worksheet.addRow(['', 'Error', obligationData.error]);
+    } else if (!obligationData.obligations || obligationData.obligations.length === 0) {
+        worksheet.addRow(['', '', 'No obligations found']);
+    } else {
+        // Add headers
+        workbookManager.addHeaderRow(worksheet, ['Obligation Name', 'Status', 'Effective From', 'Effective To']);
+
+        // Add data
+        const obligationRows = obligationData.obligations.map(obligation => [
+            obligation.name || 'Unknown',
+            obligation.status || 'Unknown',
+            obligation.effectiveFrom || 'N/A',
+            obligation.effectiveTo || 'Active'
+        ]);
+        workbookManager.addDataRows(worksheet, obligationRows, 'B', { borders: true, alternateRows: true });
+
+        // Add summary section
+        worksheet.addRow([]);
+        const summaryHeader = worksheet.addRow(['', 'Key Obligations Summary']);
+        summaryHeader.getCell('B').font = { bold: true, size: 12 };
+        worksheet.addRow([]);
+
+        const summaryData = [
+            ['Income Tax (Company)', obligationData.income_tax_company_status || 'No obligation'],
+            ['VAT', obligationData.vat_status || 'No obligation'],
+            ['PAYE', obligationData.paye_status || 'No obligation']
+        ];
+        summaryData.forEach(([name, status]) => {
+            const row = worksheet.addRow(['', name, status]);
+            row.getCell('B').font = { bold: true };
+            
+            // Add borders to summary cells
+            row.eachCell((cell, colNumber) => {
+                if (colNumber > 1 && colNumber <= 3) {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                    cell.alignment = { vertical: 'middle' };
+                }
+            });
+        });
+    }
+
+    workbookManager.autoFitColumns(worksheet);
+    
+    return worksheet;
+}
+
+// Run obligation check and export to consolidated workbook
+async function runObligationCheckConsolidated(company, downloadPath, progressCallback) {
+    try {
+        progressCallback({ log: 'Initializing consolidated workbook...' });
+        
+        // Initialize shared workbook manager
+        const SharedWorkbookManager = require('./shared-workbook-manager');
+        const workbookManager = new SharedWorkbookManager(company, downloadPath);
+        const companyFolder = await workbookManager.initialize();
+        
+        progressCallback({ log: `Company folder: ${companyFolder}` });
+        progressCallback({ log: 'Running obligation check...' });
+        
+        // Run obligation check
+        const obligationResult = await runObligationCheck(company, progressCallback);
+        
+        if (obligationResult.success && obligationResult.data) {
+            progressCallback({ log: 'Adding obligation data to consolidated report...' });
+            
+            // Export to sheet
+            await exportObligationToSheet(workbookManager, obligationResult.data);
+            
+            // Save the workbook
+            const savedWorkbook = await workbookManager.save();
+            
+            progressCallback({ log: `Report saved: ${savedWorkbook.fileName}` });
+            
+            return {
+                success: true,
+                data: obligationResult.data,
+                filePath: savedWorkbook.filePath,
+                fileName: savedWorkbook.fileName,
+                companyFolder: savedWorkbook.companyFolder
+            };
+        } else {
+            return obligationResult;
+        }
+    } catch (error) {
+        progressCallback({ log: `Error: ${error.message}`, logType: 'error' });
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+module.exports = { 
+    runObligationCheck,
+    exportObligationToSheet,
+    runObligationCheckConsolidated
+};
