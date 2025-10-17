@@ -732,21 +732,38 @@ function displayObligationResults(data) {
     const allObligations = data.obligations || [];
 
     tableHtml += `
-        <h4>Tax Obligation Status</h4>
-        
-        <!-- Summary Section -->
+        <h4>Taxpayer Status</h4>
         <div class="summary-section">
+            <div class="summary-card">
+                <span class="summary-label">PIN Status</span>
+                <span class="summary-value ${data.pin_status === 'Active' ? 'success-status' : 'warning-status'}">${data.pin_status || 'Unknown'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">iTax Status</span>
+                <span class="summary-value ${data.itax_status === 'Registered' ? 'success-status' : 'warning-status'}">${data.itax_status || 'Unknown'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">eTIMS Registration</span>
+                <span class="summary-value ${data.etims_registration === 'Active' ? 'success-status' : 'warning-status'}">${data.etims_registration || 'Unknown'}</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">TIMS Registration</span>
+                <span class="summary-value ${data.tims_registration === 'Active' ? 'success-status' : 'warning-status'}">${data.tims_registration || 'Unknown'}</span>
+            </div>
+        </div>
+
+        <div class="summary-section" style="margin-top: 10px;">
+            <div class="summary-card">
+                <span class="summary-label">VAT Compliance</span>
+                <span class="summary-value ${data.vat_compliance === 'Compliant' ? 'success-status' : 'error-status'}">${data.vat_compliance || 'Unknown'}</span>
+            </div>
             <div class="summary-card">
                 <span class="summary-label">Total Obligations</span>
                 <span class="summary-value">${allObligations.length}</span>
             </div>
             <div class="summary-card">
                 <span class="summary-label">Active Obligations</span>
-                <span class="summary-value success-status">${allObligations.filter(o => o.status && o.status.toLowerCase().includes('active')).length}</span>
-            </div>
-            <div class="summary-card">
-                <span class="summary-label">Company</span>
-                <span class="summary-value">${data.company_name || 'N/A'}</span>
+                <span class="summary-value success-status">${allObligations.filter(o => o.status && (o.status.toLowerCase().includes('active') || o.status.toLowerCase().includes('registered'))).length}</span>
             </div>
             <div class="summary-card">
                 <span class="summary-label">Status</span>
@@ -757,6 +774,7 @@ function displayObligationResults(data) {
 
     if (allObligations.length > 0) {
         tableHtml += `
+            <h4 style="margin-top: 20px;">Tax Obligations</h4>
             <!-- Main Obligations Table -->
             <table class="results-table">
                 <thead>
@@ -771,7 +789,7 @@ function displayObligationResults(data) {
         `;
 
         allObligations.forEach(obligation => {
-            const statusClass = obligation.status && obligation.status.toLowerCase().includes('active') ? 'success-status' : 
+            const statusClass = obligation.status && (obligation.status.toLowerCase().includes('active') || obligation.status.toLowerCase().includes('registered')) ? 'success-status' : 
                                obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
                                'warning-status';
             
@@ -796,8 +814,6 @@ function displayObligationResults(data) {
             </div>
         `;
     }
-
-    // No duplicate section needed - the main table already shows all the obligation data
 
     elements.obligationResults.innerHTML = tableHtml;
     elements.obligationResults.classList.remove('hidden');

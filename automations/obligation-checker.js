@@ -90,12 +90,177 @@ async function processCompanyData(company, page, progressCallback) {
             progressCallback({ log: 'Fetching obligation details...' });
             await page.getByRole("group", { name: "Obligation Details" }).click();
 
-            const tableContent = await page.evaluate(() => {
-                const table = document.querySelector("#pinCheckerForm > div:nth-child(9) > center > div > table > tbody > tr:nth-child(5) > td > fieldset > div > table");
-                return table ? table.innerText : "Table not found";
+            // Use the comprehensive extraction method to get all data in one go
+            const extractedData = await page.evaluate(() => {
+                // Function to extract data from the table
+                function extractTableData() {
+                    const result = {
+                        taxpayerDetails: {},
+                        obligationDetails: [],
+                        electronicTaxInvoicing: {},
+                        vatCompliance: {}
+                    };
+
+                    // Get the main table container
+                    const mainTable = document.querySelector('#pinCheckerForm > div:nth-child(9) > center > div > table');
+                    if (!mainTable) {
+                        console.error('Main table not found');
+                        return result;
+                    }
+
+                    // Extract Taxpayer Details (3rd row in the main table)
+                    const taxpayerRow = mainTable.querySelector('tr:nth-child(3)');
+                    if (taxpayerRow) {
+                        const taxpayerTable = taxpayerRow.querySelector('table');
+                        if (taxpayerTable) {
+                            const rows = taxpayerTable.querySelectorAll('tr');
+                            rows.forEach(row => {
+                                const cells = row.querySelectorAll('td.textAlignLeft');
+                                if (cells.length >= 4) {
+                                    result.taxpayerDetails[cells[0].textContent.trim().replace(':', '')] = cells[1].textContent.trim();
+                                    result.taxpayerDetails[cells[2].textContent.trim().replace(':', '')] = cells[3].textContent.trim();
+                                }
+                            });
+                        }
+                    }
+
+                    // Extract Obligation Details (5th row in the main table)
+                    const obligationRow = mainTable.querySelector('tr:nth-child(5)');
+                    if (obligationRow) {
+                        const obligationTable = obligationRow.querySelector('table.tab3');
+                        if (obligationTable) {
+                            const rows = obligationTable.querySelectorAll('tr');
+                            for (let i = 1; i < rows.length; i++) { // Skip header row
+                                const cells = rows[i].querySelectorAll('td');
+                                if (cells.length >= 4) {
+                                    result.obligationDetails.push({
+                                        obligationName: cells[0].textContent.trim(),
+                                        currentStatus: cells[1].textContent.trim(),
+                                        effectiveFromDate: cells[2].textContent.trim(),
+                                        effectiveToDate: cells[3].textContent.trim() || 'Active'
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    // Extract Electronic Tax Invoicing (7th row in the main table)
+                    const etimsRow = mainTable.querySelector('tr:nth-child(7)');
+                    if (etimsRow) {
+                        const etimsTable = etimsRow.querySelector('table');
+                        if (etimsTable) {
+                            const rows = etimsTable.querySelectorAll('tr');
+                            rows.forEach(row => {
+                                const cells = row.querySelectorAll('td.textAlignLeft');
+                                if (cells.length >= 4) {
+                                    result.electronicTaxInvoicing[cells[0].textContent.trim().replace(':', '')] = cells[1].textContent.trim();
+                                    if (cells.length > 2) {
+                                        result.electronicTaxInvoicing[cells[2].textContent.trim().replace(':', '')] = cells[3].textContent.trim();
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    // Extract VAT Compliance
+                    const vatComplianceCell = document.querySelector('#pinCheckerForm > div:nth-child(9) > center > div > table > tbody > tr:nth-child(8) > td');
+                    if (vatComplianceCell) {
+                        const vatTable = vatComplianceCell.querySelector('table');
+                        if (vatTable) {
+                            const statusCell = vatTable.querySelector('td.textAlignLeft');
+                            if (statusCell) {
+                                result.vatCompliance.status = statusCell.textContent.trim();
+                            }
+                        }
+                    }
+
+                    return result;
+                }
+
+                return extractTableData();
             });
 
-            return organizeData(company.name, tableContent);
+            // Convert the extracted data to the organized format
+            const data = {
+                company_name: company.name,
+                income_tax_company_status: 'No obligation',
+                income_tax_company_effective_from: 'No obligation',
+                income_tax_company_effective_to: 'No obligation',
+                vat_status: 'No obligation',
+                vat_effective_from: 'No obligation',
+                vat_effective_to: 'No obligation',
+                paye_status: 'No obligation',
+                paye_effective_from: 'No obligation',
+                paye_effective_to: 'No obligation',
+                rent_income_mri_status: 'No obligation',
+                rent_income_mri_effective_from: 'No obligation',
+                rent_income_mri_effective_to: 'No obligation',
+                resident_individual_status: 'No obligation',
+                resident_individual_effective_from: 'No obligation',
+                resident_individual_effective_to: 'No obligation',
+                turnover_tax_status: 'No obligation',
+                turnover_tax_effective_from: 'No obligation',
+                turnover_tax_effective_to: 'No obligation',
+                etims_registration: extractedData.electronicTaxInvoicing['eTIMS Registration'] || 'Unknown',
+                tims_registration: extractedData.electronicTaxInvoicing['TIMS Registration'] || 'Unknown',
+                vat_compliance: extractedData.vatCompliance.status || 'Unknown',
+                pin_status: extractedData.taxpayerDetails['PIN Status'] || 'Unknown',
+                itax_status: extractedData.taxpayerDetails['iTax Status'] || 'Unknown'
+            };
+
+            // Map the obligation details to the correct fields
+            if (extractedData.obligationDetails && extractedData.obligationDetails.length > 0) {
+                for (const obligation of extractedData.obligationDetails) {
+                    switch (obligation.obligationName) {
+                        case 'Income Tax - PAYE':
+                            data.paye_status = obligation.currentStatus;
+                            data.paye_effective_from = obligation.effectiveFromDate;
+                            data.paye_effective_to = obligation.effectiveToDate;
+                            break;
+                        case 'Value Added Tax (VAT)':
+                            data.vat_status = obligation.currentStatus;
+                            data.vat_effective_from = obligation.effectiveFromDate;
+                            data.vat_effective_to = obligation.effectiveToDate;
+                            break;
+                        case 'Income Tax - Company':
+                            data.income_tax_company_status = obligation.currentStatus;
+                            data.income_tax_company_effective_from = obligation.effectiveFromDate;
+                            data.income_tax_company_effective_to = obligation.effectiveToDate;
+                            break;
+                        case 'Income Tax - Rent Income (MRI)':
+                            data.rent_income_mri_status = obligation.currentStatus;
+                            data.rent_income_mri_effective_from = obligation.effectiveFromDate;
+                            data.rent_income_mri_effective_to = obligation.effectiveToDate;
+                            break;
+                        case 'Income Tax - Resident Individual':
+                            data.resident_individual_status = obligation.currentStatus;
+                            data.resident_individual_effective_from = obligation.effectiveFromDate;
+                            data.resident_individual_effective_to = obligation.effectiveToDate;
+                            break;
+                        case 'Income Tax - Turnover Tax':
+                            data.turnover_tax_status = obligation.currentStatus;
+                            data.turnover_tax_effective_from = obligation.effectiveFromDate;
+                            data.turnover_tax_effective_to = obligation.effectiveToDate;
+                            break;
+                    }
+                }
+            }
+            
+            // Build obligations array for UI compatibility
+            data.obligations = extractedData.obligationDetails.map(obligation => ({
+                name: obligation.obligationName,
+                status: obligation.currentStatus,
+                effectiveFrom: obligation.effectiveFromDate,
+                effectiveTo: obligation.effectiveToDate
+            }));
+            
+            // Add timestamp for when this company was checked
+            data.last_checked_at = new Date().toISOString();
+            
+            // Log the complete extracted data for reference/debugging
+            console.log('Complete extracted data for', company.name, ':', JSON.stringify(extractedData));
+
+            return data;
         } catch (error) {
             retries++;
             progressCallback({ log: `Attempt ${retries} failed: ${error.message}. Retrying...` });
@@ -107,59 +272,70 @@ async function processCompanyData(company, page, progressCallback) {
 }
 
 function organizeData(companyName, tableContent) {
+    const lines = tableContent.split("\n").map(line => line.trim()).filter(line => line);
     const data = {
         company_name: companyName,
-        obligations: [],
         income_tax_company_status: 'No obligation',
+        income_tax_company_effective_from: 'No obligation',
+        income_tax_company_effective_to: 'No obligation',
         vat_status: 'No obligation',
+        vat_effective_from: 'No obligation',
+        vat_effective_to: 'No obligation',
         paye_status: 'No obligation',
-        other_obligations: []
+        paye_effective_from: 'No obligation',
+        paye_effective_to: 'No obligation',
+        rent_income_mri_status: 'No obligation',
+        rent_income_mri_effective_from: 'No obligation',
+        rent_income_mri_effective_to: 'No obligation',
+        resident_individual_status: 'No obligation',
+        resident_individual_effective_from: 'No obligation',
+        resident_individual_effective_to: 'No obligation',
+        turnover_tax_status: 'No obligation',
+        turnover_tax_effective_from: 'No obligation',
+        turnover_tax_effective_to: 'No obligation',
+        etims_registration: 'Unknown',
+        tims_registration: 'Unknown',
+        vat_compliance: 'Unknown',
+        pin_status: 'Unknown',
+        itax_status: 'Unknown'
     };
 
-    if (!tableContent || tableContent === "Table not found") {
-        return data;
-    }
+    for (const line of lines) {
+        const [obligationName, currentStatus, effectiveFromDate, effectiveToDate = ""] = line.split("\t");
 
-    const lines = tableContent.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('Obligation Name'));
-
-    lines.forEach(line => {
-        const parts = line.split('\t').map(part => part.trim());
-        if (parts.length >= 2) {
-            const obligationName = parts[0] || 'Unknown';
-            const status = parts[1] || 'Unknown';
-            const effectiveFrom = parts[2] || 'N/A';
-            const effectiveTo = parts[3] || 'Active';
-
-            // Create obligation object with all details
-            const obligation = {
-                name: obligationName,
-                status: status,
-                effectiveFrom: effectiveFrom,
-                effectiveTo: effectiveTo
-            };
-
-            // Add to obligations array
-            data.obligations.push(obligation);
-
-            // Set specific obligation statuses for backward compatibility
-            if (obligationName.toLowerCase().includes('income tax') && obligationName.toLowerCase().includes('company')) {
-                data.income_tax_company_status = status;
-                data.income_tax_company_from = effectiveFrom;
-                data.income_tax_company_to = effectiveTo;
-            } else if (obligationName.toLowerCase().includes('value added tax') || obligationName.toLowerCase().includes('vat')) {
-                data.vat_status = status;
-                data.vat_from = effectiveFrom;
-                data.vat_to = effectiveTo;
-            } else if (obligationName.toLowerCase().includes('paye') || (obligationName.toLowerCase().includes('income tax') && obligationName.toLowerCase().includes('paye'))) {
-                data.paye_status = status;
-                data.paye_from = effectiveFrom;
-                data.paye_to = effectiveTo;
-            } else {
-                // Add to other obligations if it's not one of the main three
-                data.other_obligations.push(obligation);
-            }
+        switch (obligationName) {
+            case 'Income Tax - PAYE':
+                data.paye_status = currentStatus;
+                data.paye_effective_from = effectiveFromDate;
+                data.paye_effective_to = effectiveToDate || "Active";
+                break;
+            case 'Value Added Tax (VAT)':
+                data.vat_status = currentStatus;
+                data.vat_effective_from = effectiveFromDate;
+                data.vat_effective_to = effectiveToDate || "Active";
+                break;
+            case 'Income Tax - Company':
+                data.income_tax_company_status = currentStatus;
+                data.income_tax_company_effective_from = effectiveFromDate;
+                data.income_tax_company_effective_to = effectiveToDate || "Active";
+                break;
+            case 'Income Tax - Rent Income (MRI)':
+                data.rent_income_mri_status = currentStatus;
+                data.rent_income_mri_effective_from = effectiveFromDate;
+                data.rent_income_mri_effective_to = effectiveToDate || "Active";
+                break;
+            case 'Income Tax - Resident Individual':
+                data.resident_individual_status = currentStatus;
+                data.resident_individual_effective_from = effectiveFromDate;
+                data.resident_individual_effective_to = effectiveToDate || "Active";
+                break;
+            case 'Income Tax - Turnover Tax':
+                data.turnover_tax_status = currentStatus;
+                data.turnover_tax_effective_from = effectiveFromDate;
+                data.turnover_tax_effective_to = effectiveToDate || "Active";
+                break;
         }
-    });
+    }
 
     return data;
 }
@@ -176,37 +352,69 @@ async function exportObligationToSheet(workbookManager, obligationData) {
 
     if (obligationData.error) {
         worksheet.addRow(['', 'Error', obligationData.error]);
-    } else if (!obligationData.obligations || obligationData.obligations.length === 0) {
-        worksheet.addRow(['', '', 'No obligations found']);
     } else {
-        // Add headers
-        workbookManager.addHeaderRow(worksheet, ['Obligation Name', 'Status', 'Effective From', 'Effective To']);
-
-        // Add data
-        const obligationRows = obligationData.obligations.map(obligation => [
-            obligation.name || 'Unknown',
-            obligation.status || 'Unknown',
-            obligation.effectiveFrom || 'N/A',
-            obligation.effectiveTo || 'Active'
-        ]);
-        workbookManager.addDataRows(worksheet, obligationRows, 'B', { borders: true, alternateRows: true });
-
-        // Add summary section
+        // Add Taxpayer Status section
         worksheet.addRow([]);
-        const summaryHeader = worksheet.addRow(['', 'Key Obligations Summary']);
-        summaryHeader.getCell('B').font = { bold: true, size: 12 };
+        const statusHeader = worksheet.addRow(['', 'Taxpayer Status']);
+        statusHeader.getCell('B').font = { bold: true, size: 12 };
         worksheet.addRow([]);
-
-        const summaryData = [
-            ['Income Tax (Company)', obligationData.income_tax_company_status || 'No obligation'],
-            ['VAT', obligationData.vat_status || 'No obligation'],
-            ['PAYE', obligationData.paye_status || 'No obligation']
+        
+        const statusData = [
+            ['PIN Status', obligationData.pin_status || 'Unknown'],
+            ['iTax Status', obligationData.itax_status || 'Unknown']
         ];
-        summaryData.forEach(([name, status]) => {
-            const row = worksheet.addRow(['', name, status]);
+        statusData.forEach(([name, value]) => {
+            const row = worksheet.addRow(['', name, value]);
             row.getCell('B').font = { bold: true };
             
-            // Add borders to summary cells
+            // Add borders manually
+            row.eachCell((cell, colNumber) => {
+                if (colNumber > 1 && colNumber <= 3) {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                    cell.alignment = { vertical: 'middle' };
+                }
+            });
+        });
+
+        // Add Tax Obligations section
+        worksheet.addRow([]);
+        const obligationHeader = worksheet.addRow(['', 'Tax Obligations']);
+        obligationHeader.getCell('B').font = { bold: true, size: 12 };
+        worksheet.addRow([]);
+        
+        workbookManager.addHeaderRow(worksheet, ['Obligation Type', 'Status', 'Effective From', 'Effective To']);
+
+        const obligationRows = [
+            ['Income Tax - Company', obligationData.income_tax_company_status || 'No obligation', obligationData.income_tax_company_effective_from || 'N/A', obligationData.income_tax_company_effective_to || 'N/A'],
+            ['Value Added Tax (VAT)', obligationData.vat_status || 'No obligation', obligationData.vat_effective_from || 'N/A', obligationData.vat_effective_to || 'N/A'],
+            ['Income Tax - PAYE', obligationData.paye_status || 'No obligation', obligationData.paye_effective_from || 'N/A', obligationData.paye_effective_to || 'N/A'],
+            ['Income Tax - Rent Income (MRI)', obligationData.rent_income_mri_status || 'No obligation', obligationData.rent_income_mri_effective_from || 'N/A', obligationData.rent_income_mri_effective_to || 'N/A'],
+            ['Income Tax - Resident Individual', obligationData.resident_individual_status || 'No obligation', obligationData.resident_individual_effective_from || 'N/A', obligationData.resident_individual_effective_to || 'N/A'],
+            ['Income Tax - Turnover Tax', obligationData.turnover_tax_status || 'No obligation', obligationData.turnover_tax_effective_from || 'N/A', obligationData.turnover_tax_effective_to || 'N/A']
+        ];
+        workbookManager.addDataRows(worksheet, obligationRows, 'B', { borders: true, alternateRows: true });
+
+        // Add Electronic Tax Systems section
+        worksheet.addRow([]);
+        const systemsHeader = worksheet.addRow(['', 'Electronic Tax Systems']);
+        systemsHeader.getCell('B').font = { bold: true, size: 12 };
+        worksheet.addRow([]);
+        
+        const systemsData = [
+            ['eTIMS Registration', obligationData.etims_registration || 'Unknown'],
+            ['TIMS Registration', obligationData.tims_registration || 'Unknown'],
+            ['VAT Compliance', obligationData.vat_compliance || 'Unknown']
+        ];
+        systemsData.forEach(([name, value]) => {
+            const row = worksheet.addRow(['', name, value]);
+            row.getCell('B').font = { bold: true };
+            
+            // Add borders manually
             row.eachCell((cell, colNumber) => {
                 if (colNumber > 1 && colNumber <= 3) {
                     cell.border = {
