@@ -197,6 +197,18 @@ ipcMain.handle('run-director-details-extraction', async (event, { company, downl
   }
 });
 
+// Agent checker handler
+ipcMain.handle('run-agent-check', async (event, { company, downloadPath }) => {
+  try {
+    const { checkCompanyWithholdingStatus } = require('./automations/agent-checker');
+    return await checkCompanyWithholdingStatus(company, downloadPath, (progress) => {
+      mainWindow.webContents.send('automation-progress', progress);
+    });
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 // Liabilities extraction handler
 ipcMain.handle('run-liabilities-extraction', async (event, { company, downloadPath }) => {
   try {

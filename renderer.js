@@ -52,7 +52,11 @@ const elements = {
     runObligationCheck: document.getElementById('runObligationCheck'),
     obligationResults: document.getElementById('obligationResults'),
 
-    // Step 5: Liabilities
+    // Step 6: Agent Checker
+    runAgentCheck: document.getElementById('runAgentCheck'),
+    agentCheckResults: document.getElementById('agentCheckResults'),
+
+    // Step 7: Liabilities
     runLiabilitiesExtraction: document.getElementById('runLiabilitiesExtraction'),
     liabilitiesResults: document.getElementById('liabilitiesResults'),
     
@@ -159,7 +163,12 @@ function setupEventListeners() {
         elements.runObligationCheck.addEventListener('click', runObligationCheck);
     }
     
-    // Step 5: Liabilities
+    // Step 6: Agent Checker
+    if (elements.runAgentCheck) {
+        elements.runAgentCheck.addEventListener('click', runAgentCheck);
+    }
+    
+    // Step 7: Liabilities
     if (elements.runLiabilitiesExtraction) {
         elements.runLiabilitiesExtraction.addEventListener('click', runLiabilitiesExtraction);
     }
@@ -302,12 +311,17 @@ function updateUIState() {
         elements.runDirectorDetailsExtraction.disabled = !hasValidation || appState.isProcessing;
     }
 
-    // Step 4: Obligation Checker
+    // Step 5: Obligation Checker
     if (elements.runObligationCheck) {
         elements.runObligationCheck.disabled = !hasCredentials || appState.isProcessing;
     }
 
-    // Step 5: Liabilities
+    // Step 6: Agent Checker
+    if (elements.runAgentCheck) {
+        elements.runAgentCheck.disabled = !hasCompanyData || appState.isProcessing;
+    }
+
+    // Step 7: Liabilities
     if (elements.runLiabilitiesExtraction) {
         elements.runLiabilitiesExtraction.disabled = !hasValidation || appState.isProcessing;
     }
@@ -819,6 +833,120 @@ function displayObligationResults(data) {
     elements.obligationResults.classList.remove('hidden');
 }
 
+// Display agent check results
+function displayAgentCheckResults(data) {
+    if (!elements.agentCheckResults) return;
+
+    // Display company name prominently at the top
+    let resultHtml = `
+        <div class="company-header">
+            <h3>🏢 ${data.companyName || 'Company Information'}</h3>
+            <div class="company-details">
+                <span class="company-pin">PIN: ${data.pin || 'N/A'}</span>
+                <span class="extraction-date">Checked: ${new Date(data.timestamp).toLocaleString()}</span>
+            </div>
+        </div>
+    `;
+
+    // Build table with agent status
+    resultHtml += `
+        <h4 style="margin-top: 20px;">Withholding Agent Status</h4>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Agent Type</th>
+                    <th>Status</th>
+                    <th>CAPTCHA Retries</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    // VAT Withholding Agent Row
+    if (data.vat) {
+        const vatStatus = data.vat.isRegistered === true ? 'Registered' : 
+                         data.vat.isRegistered === false ? 'Not Registered' : 'Unknown';
+        const vatStatusClass = data.vat.isRegistered === true ? 'success-status' : 
+                              data.vat.isRegistered === false ? 'error-status' : 'warning-status';
+        
+        resultHtml += `
+            <tr>
+                <td><strong>VAT Withholding Agent</strong></td>
+                <td><span class="${vatStatusClass}">${vatStatus}</span></td>
+                <td>${data.vat.captchaRetries || 0}</td>
+                <td>${data.vat.message || (data.vat.error ? `Error: ${data.vat.error}` : '-')}</td>
+            </tr>
+        `;
+    }
+
+    // Rent Income Withholding Agent Row
+    if (data.rent) {
+        const rentStatus = data.rent.isRegistered === true ? 'Registered' : 
+                          data.rent.isRegistered === false ? 'Not Registered' : 'Unknown';
+        const rentStatusClass = data.rent.isRegistered === true ? 'success-status' : 
+                               data.rent.isRegistered === false ? 'error-status' : 'warning-status';
+        
+        resultHtml += `
+            <tr>
+                <td><strong>Rent Income Withholding Agent</strong></td>
+                <td><span class="${rentStatusClass}">${rentStatus}</span></td>
+                <td>${data.rent.captchaRetries || 0}</td>
+                <td>${data.rent.message || (data.rent.error ? `Error: ${data.rent.error}` : '-')}</td>
+            </tr>
+        `;
+    }
+
+    resultHtml += `
+            </tbody>
+        </table>
+    `;
+
+    // Additional details if available
+    const hasVatDetails = data.vat?.details && Object.keys(data.vat.details).length > 0;
+    const hasRentDetails = data.rent?.details && Object.keys(data.rent.details).length > 0;
+
+    if (hasVatDetails || hasRentDetails) {
+        resultHtml += `<h4 style="margin-top: 20px;">Additional Details</h4>`;
+        
+        if (hasVatDetails) {
+            resultHtml += `
+                <div class="details-section">
+                    <h5>VAT Agent Details:</h5>
+                    <ul>
+            `;
+            for (const [key, value] of Object.entries(data.vat.details)) {
+                resultHtml += `<li><strong>${key}:</strong> ${value}</li>`;
+            }
+            resultHtml += `</ul></div>`;
+        }
+
+        if (hasRentDetails) {
+            resultHtml += `
+                <div class="details-section">
+                    <h5>Rent Income Agent Details:</h5>
+                    <ul>
+            `;
+            for (const [key, value] of Object.entries(data.rent.details)) {
+                resultHtml += `<li><strong>${key}:</strong> ${value}</li>`;
+            }
+            resultHtml += `</ul></div>`;
+        }
+    }
+
+    // Overall error if any
+    if (data.error) {
+        resultHtml += `
+            <div class="error-section">
+                <p class="error-message">⚠️ Error: ${data.error}</p>
+            </div>
+        `;
+    }
+
+    elements.agentCheckResults.innerHTML = resultHtml;
+    elements.agentCheckResults.classList.remove('hidden');
+}
+
 // Step 1: Confirm company details
 async function confirmCompanyDetails() {
     console.log('Confirm Company Details clicked');
@@ -1163,7 +1291,68 @@ async function runObligationCheck() {
     }
 }
 
-// Step 5: Run liabilities extraction
+// Step 6: Run agent check
+async function runAgentCheck() {
+    console.log('Run Agent Check clicked');
+    
+    // Check if we have company data
+    const pin = elements.kraPin?.value?.trim();
+    
+    if (!pin) {
+        await showMessage({
+            type: 'error',
+            title: 'Missing PIN',
+            message: 'Please enter KRA PIN before running agent check.'
+        });
+        return;
+    }
+    
+    // Use company data if available
+    const companyName = appState.companyData?.name || 'Unknown Company';
+    
+    try {
+        appState.isProcessing = true;
+        updateUIState();
+        showProgressSection('Checking withholding agent status...');
+        
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+        
+        const result = await ipcRenderer.invoke('run-agent-check', {
+            company: {
+                pin: pin,
+                name: companyName
+            },
+            downloadPath: downloadPath
+        });
+        
+        if (result.success) {
+            appState.agentCheckData = result.data; // Save agent check data to app state
+            displayAgentCheckResults(result.data);
+            hideProgressSection();
+            
+            await showMessage({
+                type: 'info',
+                title: 'Agent Check Complete',
+                message: 'Withholding agent check completed successfully!'
+            });
+        } else {
+            throw new Error(result.error || 'Agent check failed');
+        }
+    } catch (error) {
+        console.error('Error running agent check:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Agent Check Error',
+            message: `Failed to run agent check: ${error.message}`
+        });
+        hideProgressSection();
+    } finally {
+        appState.isProcessing = false;
+        updateUIState();
+    }
+}
+
+// Step 7: Run liabilities extraction
 async function runLiabilitiesExtraction() {
     console.log('Run Liabilities Extraction clicked');
     

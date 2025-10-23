@@ -36,24 +36,28 @@
                 <span class="tab-number">5</span>
                 <span class="tab-title">Obligations</span>
             </button>
-            <button class="tab-btn" data-tab="liabilities">
+            <button class="tab-btn" data-tab="agent-checker">
                 <span class="tab-number">6</span>
+                <span class="tab-title">Agent Check</span>
+            </button>
+            <button class="tab-btn" data-tab="liabilities">
+                <span class="tab-number">7</span>
                 <span class="tab-title">Liabilities</span>
             </button>
             <button class="tab-btn" data-tab="vat-returns">
-                <span class="tab-number">7</span>
+                <span class="tab-number">8</span>
                 <span class="tab-title">VAT</span>
             </button>
             <button class="tab-btn" data-tab="general-ledger">
-                <span class="tab-number">8</span>
+                <span class="tab-number">9</span>
                 <span class="tab-title">Ledger</span>
             </button>
             <button class="tab-btn" data-tab="tax-compliance">
-                <span class="tab-number">9</span>
+                <span class="tab-number">10</span>
                 <span class="tab-title">Tax Compliance</span>
             </button>
             <button class="tab-btn" data-tab="all-automations">
-                <span class="tab-number">10</span>
+                <span class="tab-number">11</span>
                 <span class="tab-title">Run All</span>
             </button>
         </nav>
@@ -159,7 +163,31 @@
                 </div>
             </div>
 
-            <!-- Step 5: Liabilities -->
+            <!-- Step 6: Agent Checker -->
+            <div id="agent-checker" class="tab-content">
+                <div class="form-section compact">
+                    <h2>Withholding Agent Checker</h2>
+                    <p class="step-description">Verify if the company is registered as a VAT or Rent Income withholding agent</p>
+                    
+                    <div class="info-box">
+                        <p><strong>What this checks:</strong></p>
+                        <ul>
+                            <li>✓ VAT Withholding Agent status</li>
+                            <li>✓ Rent Income Withholding Agent status</li>
+                        </ul>
+                    </div>
+
+                    <div class="action-group">
+                        <button id="runAgentCheck" class="primary-btn" disabled>Check Agent Status</button>
+                    </div>
+                    
+                    <div id="agentCheckResults" class="result-section hidden">
+                        <!-- Agent check results will be displayed here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 7: Liabilities -->
             <div id="liabilities" class="tab-content">
                 <div class="form-section compact">
                     <h2>Liabilities Extraction</h2>
