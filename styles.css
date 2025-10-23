@@ -113,12 +113,20 @@ header {
 
 .tab-btn.completed .tab-number {
     background: #28a745;
-    color: white;
+    color: transparent; /* Hide the original number */
+    font-size: 12px;
+    position: relative;
 }
 
 .tab-btn.completed .tab-number::after {
     content: '✓';
-    font-size: 8px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
 }
 
 /* Tab Content */

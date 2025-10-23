@@ -377,6 +377,15 @@ function updateUIState() {
         }
     }
 
+    const agentCheckTab = document.querySelector('[data-tab="agent-checker"]');
+    if (agentCheckTab) {
+        if (appState.agentCheckData) {
+            agentCheckTab.classList.add('completed');
+        } else {
+            agentCheckTab.classList.remove('completed');
+        }
+    }
+
     const liabilitiesTab = document.querySelector('[data-tab="liabilities"]');
     if (liabilitiesTab) {
         if (appState.liabilitiesData) {
