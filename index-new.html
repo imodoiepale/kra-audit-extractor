@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KRA Automation Suite - Professional</title>
+    <title>KRA POST PORTUM TOOL</title>
     <link rel="stylesheet" href="styles-new.css">
+    <link rel="stylesheet" href="toast-styles.css">
 </head>
 <body>
     <div class="app-container">
@@ -12,11 +13,11 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
                         <rect width="32" height="32" rx="8" fill="#667eea"/>
                         <path d="M10 16L14 20L22 12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    <span>KRA Suite</span>
+                    <span>POST PORTUM</span>
                 </div>
             </div>
 
@@ -68,6 +69,10 @@
                         <span class="nav-icon">📊</span>
                         <span class="nav-label">VAT Returns</span>
                     </button>
+                    <button class="nav-item" data-tab="wh-vat-returns">
+                        <span class="nav-icon">🧾</span>
+                        <span class="nav-label">WH VAT Returns</span>
+                    </button>
                     <button class="nav-item" data-tab="general-ledger">
                         <span class="nav-icon">📖</span>
                         <span class="nav-label">General Ledger</span>
@@ -109,23 +114,89 @@
             </div>
         </aside>
 
+        <!-- Toast Container -->
+        <div id="toastContainer" class="toast-container"></div>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>⚙️ Settings</h2>
+                    <button class="modal-close" id="closeSettingsModal">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h3>Output Folder</h3>
+                        <p class="settings-description">Choose where exported files will be saved</p>
+                        <div class="folder-selector">
+                            <input type="text" id="settingsDownloadPath" class="form-control" readonly placeholder="Select output folder...">
+                            <button id="selectOutputFolder" class="btn btn-secondary">
+                                <span>📁</span>
+                                Browse
+                            </button>
+                        </div>
+                        <div class="folder-info">
+                            <small>Default: Downloads/KRA-Automations</small>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3>Output Format</h3>
+                        <p class="settings-description">Choose the file format for exports</p>
+                        <select id="settingsOutputFormat" class="form-control">
+                            <option value="xlsx">Excel (.xlsx)</option>
+                            <option value="csv">CSV (.csv)</option>
+                            <option value="json">JSON (.json)</option>
+                        </select>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>About</h3>
+                        <p class="settings-description">KRA POST PORTUM TOOL v1.0.0</p>
+                        <p class="settings-description">Professional KRA data extraction and audit tool</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="saveSettings" class="btn btn-primary">
+                        <span>💾</span>
+                        Save Settings
+                    </button>
+                    <button id="cancelSettings" class="btn btn-ghost">Cancel</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content Area -->
         <main class="main-content">
-            <!-- Header -->
+            <!-- Page Header -->
             <header class="page-header">
                 <div class="header-left">
                     <h1 id="pageTitle">Company Setup</h1>
-                    <p id="pageDescription" class="page-description">Enter your KRA credentials to get started</p>
+                    <p class="page-description" id="pageDescription">Enter your KRA credentials to get started</p>
                 </div>
-                <div class="header-right">
-                    <div id="companyBadge" class="company-badge hidden">
-                        <span id="companyNameBadge" class="company-name">-</span>
-                        <span id="companyPinBadge" class="company-pin">-</span>
+                <div id="companyBadge" class="company-badge hidden">
+                    <div class="badge-content">
+                        <div class="badge-company-name" id="badgeCompanyName">Company</div>
+                        <div class="badge-company-pin" id="badgeCompanyPin">PIN: -</div>
                     </div>
                 </div>
             </header>
 
-            <!-- Content Views -->
+            <!-- Progress Section (TOP) -->
+            <div id="progressSection" class="progress-section-top hidden">
+                <div class="progress-card-top">
+                    <div class="progress-header">
+                        <h4 id="progressText">Processing...</h4>
+                        <span class="progress-percentage" id="progressPercentage">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-log" id="progressLog"></div>
+                </div>
+            </div>
+
+            <!-- Content Area -->
             <div class="content-area">
                 <!-- Step 1: Company Setup -->
                 <div id="company-setup" class="tab-content active">
@@ -306,6 +377,58 @@
                                 <div class="card-body">
                                     <div id="profileAgentData" class="profile-data">
                                         <p class="empty-text">Not checked</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Director Details -->
+                            <div class="card" id="profileDirectorCard">
+                                <div class="card-header">
+                                    <h4>Director Details</h4>
+                                    <span class="status-dot status-pending"></span>
+                                </div>
+                                <div class="card-body">
+                                    <div id="profileDirectorData" class="profile-data">
+                                        <p class="empty-text">Not extracted</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Withholding VAT -->
+                            <div class="card" id="profileWhVatCard">
+                                <div class="card-header">
+                                    <h4>Withholding VAT</h4>
+                                    <span class="status-dot status-pending"></span>
+                                </div>
+                                <div class="card-body">
+                                    <div id="profileWhVatData" class="profile-data">
+                                        <p class="empty-text">Not extracted</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- General Ledger -->
+                            <div class="card" id="profileLedgerCard">
+                                <div class="card-header">
+                                    <h4>General Ledger</h4>
+                                    <span class="status-dot status-pending"></span>
+                                </div>
+                                <div class="card-body">
+                                    <div id="profileLedgerData" class="profile-data">
+                                        <p class="empty-text">Not extracted</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- TCC -->
+                            <div class="card" id="profileTccCard">
+                                <div class="card-header">
+                                    <h4>Tax Compliance Certificate</h4>
+                                    <span class="status-dot status-pending"></span>
+                                </div>
+                                <div class="card-body">
+                                    <div id="profileTccData" class="profile-data">
+                                        <p class="empty-text">Not downloaded</p>
                                     </div>
                                 </div>
                             </div>
@@ -501,6 +624,88 @@
                             </div>
                             
                             <div id="vatResults" class="result-section hidden"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WH VAT Returns Tab -->
+                <div id="wh-vat-returns" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Withholding VAT Returns</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="option-group">
+                                <label class="radio-card">
+                                    <input type="radio" name="whVatDateRange" value="all" checked>
+                                    <div class="radio-content">
+                                        <strong>All Data</strong>
+                                        <small>Extract everything available</small>
+                                    </div>
+                                </label>
+                                
+                                <label class="radio-card">
+                                    <input type="radio" name="whVatDateRange" value="custom">
+                                    <div class="radio-content">
+                                        <strong>Custom Range</strong>
+                                        <small>Specify date range</small>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <div id="whVatCustomDateInputs" class="custom-date-inputs hidden">
+                                <div class="date-row">
+                                    <div class="form-group">
+                                        <label>From</label>
+                                        <div class="date-group">
+                                            <select id="whVatStartMonth" class="form-input">
+                                                <option value="1">Jan</option>
+                                                <option value="2">Feb</option>
+                                                <option value="3">Mar</option>
+                                                <option value="4">Apr</option>
+                                                <option value="5">May</option>
+                                                <option value="6">Jun</option>
+                                                <option value="7">Jul</option>
+                                                <option value="8">Aug</option>
+                                                <option value="9">Sep</option>
+                                                <option value="10">Oct</option>
+                                                <option value="11">Nov</option>
+                                                <option value="12">Dec</option>
+                                            </select>
+                                            <input type="number" id="whVatStartYear" class="form-input" min="2010" max="2030" value="2024">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>To</label>
+                                        <div class="date-group">
+                                            <select id="whVatEndMonth" class="form-input">
+                                                <option value="1">Jan</option>
+                                                <option value="2">Feb</option>
+                                                <option value="3">Mar</option>
+                                                <option value="4">Apr</option>
+                                                <option value="5">May</option>
+                                                <option value="6">Jun</option>
+                                                <option value="7">Jul</option>
+                                                <option value="8">Aug</option>
+                                                <option value="9">Sep</option>
+                                                <option value="10">Oct</option>
+                                                <option value="11">Nov</option>
+                                                <option value="12" selected>Dec</option>
+                                            </select>
+                                            <input type="number" id="whVatEndYear" class="form-input" min="2010" max="2030" value="2024">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="button-group">
+                                <button id="runWhVATExtraction" class="btn btn-primary" disabled>
+                                    <span class="btn-icon">🧾</span>
+                                    Extract WH VAT Data
+                                </button>
+                            </div>
+                            
+                            <div id="whVatResults" class="result-section hidden"></div>
                         </div>
                     </div>
                 </div>

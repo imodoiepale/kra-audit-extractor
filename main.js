@@ -14,7 +14,10 @@ function createWindow() {
       enableRemoteModule: true
     },
     icon: path.join(__dirname, 'assets', 'icon.png'),
-    show: false
+    show: false,
+    autoHideMenuBar: true, // Hide menu bar
+    frame: true,
+    title: 'KRA POST PORTUM TOOL'
   });
 
   mainWindow.loadFile('index-new.html');
@@ -154,6 +157,18 @@ ipcMain.handle('run-vat-extraction', async (event, { company, dateRange, downloa
   try {
     const { runVATExtraction } = require('./automations/vat-extraction');
     return await runVATExtraction(company, dateRange, downloadPath, (progress) => {
+      mainWindow.webContents.send('automation-progress', progress);
+    });
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Withholding VAT extraction handler
+ipcMain.handle('run-wh-vat-extraction', async (event, { company, dateRange, downloadPath }) => {
+  try {
+    const { runWhVatExtraction } = require('./automations/wh-vat-extraction');
+    return await runWhVatExtraction(company, dateRange, downloadPath, (progress) => {
       mainWindow.webContents.send('automation-progress', progress);
     });
   } catch (error) {
