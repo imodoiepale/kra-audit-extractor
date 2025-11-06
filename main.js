@@ -17,7 +17,7 @@ function createWindow() {
     show: false
   });
 
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile('index-new.html');
   
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
@@ -75,11 +75,9 @@ ipcMain.handle('load-config', async () => {
       if (data) {
         return JSON.parse(data);
       }
-      return null;
     }
     return null;
   } catch (error) {
-    console.error('Error loading config:', error);
     return null;
   }
 });
@@ -87,6 +85,20 @@ ipcMain.handle('load-config', async () => {
 ipcMain.handle('show-message', async (event, options) => {
   const result = await dialog.showMessageBox(mainWindow, options);
   return result;
+});
+
+// Open folder in file explorer
+ipcMain.handle('open-folder', async (event, folderPath) => {
+  try {
+    if (folderPath && fs.existsSync(folderPath)) {
+      await shell.openPath(folderPath);
+      return { success: true };
+    } else {
+      return { success: false, error: 'Folder does not exist' };
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
 // Manufacturer Details API handler

@@ -219,31 +219,74 @@ async function exportManufacturerToExcel(data, pin, downloadPath) {
         // Add empty row
         worksheet.addRow([]);
 
-        // Prepare data for export
+        // Prepare comprehensive data for export - extract ALL available fields
+        const basic = data.timsManBasicRDtlDTO || {};
+        const business = data.manBusinessRDtlDTO || {};
+        const contact = data.manContactRDtlDTO || {};
+        const address = data.manAddRDtlDTO || {};
+        const disclaimer = data.manDisclaimerDtlDTO || {};
+        const authorization = data.manAuthDTO || {};
+        
         const details = [
-            { category: 'Basic Information', field: 'PIN', value: pin },
-            { category: 'Basic Information', field: 'Manufacturer Name', value: data.timsManBasicRDtlDTO?.manufacturerName },
-            { category: 'Basic Information', field: 'Business Registration No.', value: data.timsManBasicRDtlDTO?.manufacturerBrNo },
+            // Basic Information
+            { category: 'Basic Information', field: 'Manufacturer PIN', value: pin },
+            { category: 'Basic Information', field: 'Manufacturer Name', value: basic.manufacturerName },
+            { category: 'Basic Information', field: 'Business Registration No.', value: basic.manufacturerBrNo },
+            { category: 'Basic Information', field: 'Manufacturer Code', value: basic.manufacturerCode },
+            { category: 'Basic Information', field: 'Manufacturer Type', value: basic.manufacturerType },
+            { category: 'Basic Information', field: 'Registration Status', value: basic.registrationStatus },
+            { category: 'Basic Information', field: 'Effective Date', value: basic.effectiveDate },
             
-            { category: 'Business Details', field: 'Business Name', value: data.manBusinessRDtlDTO?.businessName },
-            { category: 'Business Details', field: 'Business Registration Date', value: data.manBusinessRDtlDTO?.businessRegDate },
-            { category: 'Business Details', field: 'Business Commence Date', value: data.manBusinessRDtlDTO?.businessComDate },
+            // Business Details
+            { category: 'Business Details', field: 'Business Name', value: business.businessName },
+            { category: 'Business Details', field: 'Business Registration Certificate No.', value: business.businessRegCertNo },
+            { category: 'Business Details', field: 'Business Registration Date', value: business.businessRegDate },
+            { category: 'Business Details', field: 'Business Commencement Date', value: business.businessComDate },
+            { category: 'Business Details', field: 'Nature of Business', value: business.natureOfBusiness },
+            { category: 'Business Details', field: 'Business Type', value: business.businessType },
+            { category: 'Business Details', field: 'Business Category', value: business.businessCategory },
             
-            { category: 'Contact Information', field: 'Mobile Number', value: data.manContactRDtlDTO?.mobileNo },
-            { category: 'Contact Information', field: 'Main Email', value: data.manContactRDtlDTO?.mainEmail },
-            { category: 'Contact Information', field: 'Secondary Email', value: data.manContactRDtlDTO?.secondaryEmail },
+            // Contact Information
+            { category: 'Contact Information', field: 'Mobile Number', value: contact.mobileNo },
+            { category: 'Contact Information', field: 'Telephone Number', value: contact.telephoneNo },
+            { category: 'Contact Information', field: 'Fax Number', value: contact.faxNo },
+            { category: 'Contact Information', field: 'Main Email', value: contact.mainEmail },
+            { category: 'Contact Information', field: 'Secondary Email', value: contact.secondaryEmail },
+            { category: 'Contact Information', field: 'Website', value: contact.website },
             
-            { category: 'Address Information', field: 'Building Number', value: data.manAddRDtlDTO?.buldgNo },
-            { category: 'Address Information', field: 'Street/Road', value: data.manAddRDtlDTO?.streetRoad },
-            { category: 'Address Information', field: 'City/Town', value: data.manAddRDtlDTO?.cityTown },
-            { category: 'Address Information', field: 'County', value: data.manAddRDtlDTO?.county },
-            { category: 'Address Information', field: 'District', value: data.manAddRDtlDTO?.district },
-            { category: 'Address Information', field: 'Tax Area Locality', value: data.manAddRDtlDTO?.taxAreaLocality },
-            { category: 'Address Information', field: 'Descriptive Address', value: data.manAddRDtlDTO?.descriptiveAddress?.replace(/\n/g, ', ') },
-            { category: 'Address Information', field: 'PO Box', value: data.manAddRDtlDTO?.poBox },
-            { category: 'Address Information', field: 'Postal Code', value: data.manAddRDtlDTO?.postalCode },
+            // Physical Address
+            { category: 'Physical Address', field: 'Building Name', value: address.buildingName },
+            { category: 'Physical Address', field: 'Building Number', value: address.buldgNo },
+            { category: 'Physical Address', field: 'Floor Number', value: address.floorNo },
+            { category: 'Physical Address', field: 'Room Number', value: address.roomNo },
+            { category: 'Physical Address', field: 'Street/Road', value: address.streetRoad },
+            { category: 'Physical Address', field: 'City/Town', value: address.cityTown },
+            { category: 'Physical Address', field: 'County', value: address.county },
+            { category: 'Physical Address', field: 'Sub-County', value: address.subCounty },
+            { category: 'Physical Address', field: 'District', value: address.district },
+            { category: 'Physical Address', field: 'Tax Area Locality', value: address.taxAreaLocality },
+            { category: 'Physical Address', field: 'LR Number', value: address.lrNo },
+            { category: 'Physical Address', field: 'Plot Number', value: address.plotNo },
+            { category: 'Physical Address', field: 'Landmark', value: address.landmark },
+            { category: 'Physical Address', field: 'Descriptive Address', value: address.descriptiveAddress?.replace(/\n/g, ', ') },
             
-            { category: 'Additional Information', field: 'Disclaimer', value: data.manDisclaimerDtlDTO?.disclaimer }
+            // Postal Address
+            { category: 'Postal Address', field: 'PO Box', value: address.poBox },
+            { category: 'Postal Address', field: 'Postal Code', value: address.postalCode },
+            { category: 'Postal Address', field: 'Town', value: address.postalTown },
+            
+            // Authorization Details
+            { category: 'Authorization Details', field: 'Authorization Number', value: authorization.authorizationNo },
+            { category: 'Authorization Details', field: 'Authorization Date', value: authorization.authorizationDate },
+            { category: 'Authorization Details', field: 'Authorization Status', value: authorization.authorizationStatus },
+            { category: 'Authorization Details', field: 'Expiry Date', value: authorization.expiryDate },
+            { category: 'Authorization Details', field: 'Renewal Date', value: authorization.renewalDate },
+            
+            // Additional Information
+            { category: 'Additional Information', field: 'Tax Payer Name', value: data.taxpayerName },
+            { category: 'Additional Information', field: 'Obligation Type', value: data.obligationType },
+            { category: 'Additional Information', field: 'Registration Date', value: data.registrationDate },
+            { category: 'Additional Information', field: 'Disclaimer', value: disclaimer.disclaimer }
         ];
 
         // Add headers

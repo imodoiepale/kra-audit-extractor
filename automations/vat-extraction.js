@@ -3,6 +3,7 @@ const { createWorker } = require('tesseract.js');
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs').promises;
+const SharedWorkbookManager = require('./shared-workbook-manager');
 const os = require('os');
 
 // Constants and date formatting
@@ -127,9 +128,13 @@ function isDateInRange(dateString, startYear, startMonth, endYear, endMonth) {
 }
 
 async function runVATExtraction(company, dateRange, downloadPath, progressCallback) {
-    // Create download folder
-    const vatDownloadPath = path.join(downloadPath, `AUTO EXTRACT FILED RETURNS- ${formattedDateTime}`);
-    await fs.mkdir(vatDownloadPath, { recursive: true });
+    // Initialize SharedWorkbookManager for company folder
+    const workbookManager = new SharedWorkbookManager(company, downloadPath);
+    const companyFolder = await workbookManager.initialize();
+    
+    progressCallback({
+        log: `Company folder: ${companyFolder}`
+    });
 
     progressCallback({
         stage: 'VAT Returns Extraction',
@@ -152,7 +157,7 @@ async function runVATExtraction(company, dateRange, downloadPath, progressCallba
             throw new Error('Login failed. Please check credentials and try again.');
         }
 
-        const results = await processVATReturns(page, company, dateRange, vatDownloadPath, progressCallback);
+        const results = await processVATReturns(page, company, dateRange, companyFolder, workbookManager, progressCallback);
 
         await browser.close();
 
@@ -166,7 +171,8 @@ async function runVATExtraction(company, dateRange, downloadPath, progressCallba
             success: true,
             message: 'VAT returns extracted successfully.',
             files: [results.filePath],
-            downloadPath: vatDownloadPath,
+            downloadPath: companyFolder,
+            companyFolder: companyFolder,
             data: results.data,
             totalReturns: results.totalReturns,
             companyData: results.companyData, // Include detailed company data for UI
@@ -458,11 +464,11 @@ async function extractVATData(page, company, dateRange, downloadPath, progressCa
     };
 }
 
-async function processVATReturns(page, company, dateRange, downloadPath, progressCallback) {
+async function processVATReturns(page, company, dateRange, downloadPath, workbookManager, progressCallback) {
     const workbook = new ExcelJS.Workbook();
     
-    // Create summary worksheet
-    const summarySheet = workbook.addWorksheet("SUMMARY");
+    // Note: Removed "FILED RETURNS ALL MONTHS" worksheet as it's not being populated correctly
+    // All data goes directly into section worksheets
     
     // Initialize company data structure
     const companyData = {
@@ -485,52 +491,84 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
         }
     };
 
-    // Section definitions with worksheet names
-    const VAT_SECTIONS = {
-        sectionF: { name: "Section F - Purchases and Input Tax", sheetName: "F-Purchases", headers: ["Type of Purchases", "PIN of Supplier", "Name of Supplier", "Invoice Date", "Invoice Number", "Description of Goods / Services", "Custom Entry Number", "Taxable Value (Ksh)", "Amount of VAT (Ksh)", "Relevant Invoice Number", "Relevant Invoice Date"] },
-        sectionB: { name: "Section B - Sales and Output Tax", sheetName: "B-Sales", headers: ["PIN of Purchaser", "Name of Purchaser", "ETR Serial Number", "Invoice Date", "Invoice Number", "Description of Goods / Services", "Taxable Value (Ksh)", "Amount of VAT (Ksh)", "Relevant Invoice Number", "Relevant Invoice Date"] },
-        sectionB2: { name: "Section B2 - Sales Totals", sheetName: "B2-Sales Totals", headers: ["Description", "Taxable Value (Ksh)", "Amount of VAT (Ksh)"] },
-        sectionE: { name: "Section E - Sales Exempt", sheetName: "E-Sales Exempt", headers: ["PIN of Purchaser", "Name of Purchaser", "ETR Serial Number", "Invoice Date", "Invoice Number", "Description of Goods / Services", "Sales Value (Ksh)"] },
-        sectionF2: { name: "Section F2 - Purchases Totals", sheetName: "F2-Purchases Totals", headers: ["Description", "Taxable Value (Ksh)", "Amount of VAT (Ksh)"] },
-        sectionK3: { name: "Section K3 - Credit Adjustment Voucher", sheetName: "K3-Credit Vouchers", headers: ["Credit Adjustment Voucher Number", "Date of Voucher", "Amount"] },
-        sectionM: { name: "Section M - Sales Summary", sheetName: "M-Sales Summary", headers: ["Sr.No.", "Details of Sales", "Amount (Excl. VAT) (Ksh)", "Rate (%)", "Amount of Output VAT (Ksh)"] },
-        sectionN: { name: "Section N - Purchases Summary", sheetName: "N-Purchases Summary", headers: ["Sr.No.", "Details of Purchases", "Amount (Excl. VAT) (Ksh)", "Rate (%)", "Amount of Input VAT (Ksh)"] },
-        sectionO: { name: "Section O - Tax Calculation", sheetName: "O-Tax Calculation", headers: ["Sr.No.", "Descriptions", "Amount (Ksh)"] }
+    // Create Section B worksheet
+    const sectionBWorksheet = workbook.addWorksheet("Section B");
+    const sectionBWorksheetHeader = sectionBWorksheet.addRow([
+        "", "", "", "", `Section B : Sales and Output Tax on Sales for the period (General Rate)`
+    ]);
+    highlightCells(sectionBWorksheetHeader, "B", "N", "83EBFF", true);
+    sectionBWorksheet.addRow();
+
+    // Create Section B2 worksheet
+    const sectionB2Worksheet = workbook.addWorksheet("Section B2 - TOTALS");
+    const sectionB2WorksheetHeader = sectionB2Worksheet.addRow([
+        "", "", `Section B2 : Sales and Output Tax on Sales for the period (General Rate)`
+    ]);
+    highlightCells(sectionB2WorksheetHeader, "B", "N", "83EBFF", true);
+    sectionB2Worksheet.addRow();
+
+    // Create Section E worksheet
+    const sectionEWorksheet = workbook.addWorksheet("Section E");
+    const sectionEWorksheetHeader = sectionEWorksheet.addRow(["", "", "", `Section E : Sales for the Period (Exempt)`]);
+    highlightCells(sectionEWorksheetHeader, "B", "I", "83EBFF", true);
+    sectionEWorksheet.addRow();
+
+    // Create Section F worksheet
+    const sectionFWorksheet = workbook.addWorksheet("Section F");
+    const sectionFWorksheetHeader = sectionFWorksheet.addRow([
+        "", "", "", "", "", `Section F : Purchases and Input Tax for the period (General Rate)`
+    ]);
+    highlightCells(sectionFWorksheetHeader, "B", "N", "83EBFF", true);
+    sectionFWorksheet.addRow();
+
+    // Create Section F2 worksheet
+    const sectionF2Worksheet = workbook.addWorksheet("Section F2 - TOTALS");
+    const sectionF2WorksheetHeader = sectionF2Worksheet.addRow([
+        "", "", "", `Section F2 : TOTALS Purchases and Input Tax for the period (General Rate)`
+    ]);
+    highlightCells(sectionF2WorksheetHeader, "B", "N", "83EBFF", true);
+    sectionF2Worksheet.addRow();
+
+    // Create Section K3 worksheet
+    const sectionK3Worksheet = workbook.addWorksheet("Section K3 ");
+    const sectionK3WorksheetHeader = sectionK3Worksheet.addRow([
+        "", "", "", `Section K3 : Credit Adjustment Voucher/Inventory Approval Order`
+    ]);
+    highlightCells(sectionK3WorksheetHeader, "B", "N", "83EBFF", true);
+    sectionK3Worksheet.addRow();
+
+    // Create Section M worksheet
+    const sectionMWorksheet = workbook.addWorksheet("Section M");
+    const sectionMWorksheetHeader = sectionMWorksheet.addRow(["", "", "", `Section M : Sales (Goods and Services)`]);
+    highlightCells(sectionMWorksheetHeader, "B", "G", "83EBFF", true);
+    sectionMWorksheet.addRow();
+
+    // Create Section N worksheet
+    const sectionNWorksheet = workbook.addWorksheet("Section N");
+    const sectionNWorksheetHeader = sectionNWorksheet.addRow(["", "", "", `Section N : Purchases (Goods and Services)`]);
+    highlightCells(sectionNWorksheetHeader, "B", "G", "83EBFF", true);
+    sectionNWorksheet.addRow();
+
+    // Create Section O worksheet
+    const sectionOWorksheet = workbook.addWorksheet("Section O");
+    const sectionOWorksheetHeader = sectionOWorksheet.addRow(["", "", "", `Section O : Calculation of Tax Due`]);
+    highlightCells(sectionOWorksheetHeader, "B", "E", "83EBFF", true);
+    sectionOWorksheet.addRow();
+
+    // Main worksheet header removed - data goes directly to section worksheets
+
+    // Create section worksheets object for processing
+    const sectionWorksheets = {
+        sectionB: { worksheet: sectionBWorksheet, name: "Section B" },
+        sectionB2: { worksheet: sectionB2Worksheet, name: "Section B2" },
+        sectionE: { worksheet: sectionEWorksheet, name: "Section E" },
+        sectionF: { worksheet: sectionFWorksheet, name: "Section F" },
+        sectionF2: { worksheet: sectionF2Worksheet, name: "Section F2" },
+        sectionK3: { worksheet: sectionK3Worksheet, name: "Section K3" },
+        sectionM: { worksheet: sectionMWorksheet, name: "Section M" },
+        sectionN: { worksheet: sectionNWorksheet, name: "Section N" },
+        sectionO: { worksheet: sectionOWorksheet, name: "Section O" }
     };
-
-    // Create worksheets for each section
-    const sectionWorksheets = {};
-    Object.entries(VAT_SECTIONS).forEach(([key, config]) => {
-        const worksheet = workbook.addWorksheet(config.sheetName);
-        sectionWorksheets[key] = { worksheet, config };
-        
-        // Add section title
-        const titleRow = worksheet.addRow([config.name]);
-        worksheet.mergeCells(`A1:${String.fromCharCode(64 + config.headers.length)}1`);
-        const titleCell = worksheet.getCell('A1');
-        titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5DFFC9' } };
-        titleCell.font = { size: 14, bold: true };
-        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-        titleRow.height = 25;
-        worksheet.addRow([]);
-    });
-
-    // Summary sheet header
-    const titleRow = summarySheet.addRow([`VAT FILED RETURNS - ${company.name}`]);
-    summarySheet.mergeCells('A1:H1');
-    const titleCell = summarySheet.getCell('A1');
-    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF83EBFF' } };
-    titleCell.font = { size: 16, bold: true };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    titleRow.height = 30;
-    
-    summarySheet.addRow([]);
-    const infoRow = summarySheet.addRow([`PIN: ${company.pin}`, `Extraction Date: ${formattedDateTime}`]);
-    infoRow.eachCell((cell) => {
-        cell.font = { bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFADD8E6' } };
-    });
-    summarySheet.addRow([]);
 
     // Navigate to VAT returns
     await navigateToVATReturns(page, progressCallback);
@@ -573,6 +611,7 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
 
     let processedCount = 0;
     let extractedData = [];
+    let companyNameRowAdded = false;
 
     // Process each return with detailed extraction
     for (let i = 1; i < returnRows.length; i++) { // Start from 1 to skip header row
@@ -617,32 +656,39 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
                     if (nilReturnCount > 0) {
                         progressCallback({ log: `${periodKey} is a NIL RETURN - skipping detailed extraction` });
 
-                        // Add nil return data
+                        const nilMessage = "NIL RETURN - No data available";
+
+                        // Add nil return data to company structure
                         const nilReturnData = {
                             period: periodKey,
                             date: cleanDate,
                             month: month,
                             year: year,
                             type: "NIL_RETURN",
-                            message: "No data available - NIL RETURN"
+                            message: nilMessage
                         };
 
-                        // Add to all sections
                         Object.keys(companyData.filedReturns.sections).forEach(sectionKey => {
                             companyData.filedReturns.sections[sectionKey].push({
                                 ...nilReturnData,
                                 section: sectionKey
                             });
                         });
-
-                        // Add summary info for nil return
-                        summarySheet.addRow([periodKey, cleanDate, 'NIL RETURN', 'No data available']);
                     } else {
-                        // Extract detailed section data with separate worksheets
-                        await extractDetailedSectionDataWithWorksheets(page2, sectionWorksheets, month, year, cleanDate, periodKey, progressCallback);
-
-                        // Add summary info
-                        summarySheet.addRow([periodKey, cleanDate, 'SUCCESS', 'All sections extracted']);
+                        // Extract detailed section data - matching original format
+                        await extractDetailedSectionDataOriginalFormat(
+                            page2, 
+                            sectionWorksheets, 
+                            null, // No main worksheet - data goes to section worksheets
+                            company, 
+                            month, 
+                            year, 
+                            cleanDate, 
+                            periodKey, 
+                            companyNameRowAdded,
+                            progressCallback
+                        );
+                        companyNameRowAdded = true;
                     }
 
                     await page2.close();
@@ -651,13 +697,7 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
                         log: `Error extracting detailed data for ${cleanDate}: ${detailError.message}`,
                         logType: 'warning'
                     });
-                    
-                    // Add error to summary
-                    summarySheet.addRow([periodKey, cleanDate, 'ERROR', detailError.message]);
                 }
-            } else {
-                // Add basic return info if no view link
-                summarySheet.addRow([periodKey, cleanDate, 'NO LINK', 'View link unavailable']);
             }
 
             // Store extracted data
@@ -690,19 +730,6 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
     if (processedCount === 0) {
         progressCallback({ log: `No returns found in the specified date range: ${startMonth}/${startYear} to ${endMonth}/${endYear}` });
 
-        // Add no data message to summary
-        const noDataRow = summarySheet.addRow([
-            `${startMonth}/${startYear} to ${endMonth}/${endYear}`,
-            '-',
-            'NO DATA',
-            'No returns found for specified period'
-        ]);
-        noDataRow.eachCell((cell) => {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
-            cell.font = { bold: true };
-        });
-        summarySheet.addRow([]);
-
         // Add no data message to company structure
         const noDataMessage = {
             period: `${startMonth}/${startYear} to ${endMonth}/${endYear}`,
@@ -723,9 +750,30 @@ async function processVATReturns(page, company, dateRange, downloadPath, progres
         autoFitColumns(worksheet);
     });
 
-    // Save the Excel file
-    const filePath = path.join(downloadPath, `VAT_RETURNS_${company.pin}_${formattedDateTime.replace(/\./g, '-')}.xlsx`);
+    // Auto-fit columns for all worksheets
+    workbook.eachSheet((ws) => {
+        ws.columns.forEach((column, columnIndex) => {
+            let maxLength = 0;
+            for (let rowIndex = 2; rowIndex <= ws.rowCount; rowIndex++) {
+                const cell = ws.getCell(rowIndex, columnIndex + 1);
+                const cellLength = cell.value ? cell.value.toString().length : 0;
+                if (cellLength > maxLength) {
+                    maxLength = cellLength;
+                }
+            }
+            ws.getColumn(columnIndex + 1).width = maxLength + 2;
+        });
+    });
+
+    // Save the Excel file using SharedWorkbookManager in company folder
+    const fileName = `VAT_FILED_RETURNS_${company.pin}_${formattedDateTime}.xlsx`;
+    const filePath = path.join(downloadPath, fileName);
     await workbook.xlsx.writeFile(filePath);
+    
+    progressCallback({
+        log: `VAT returns saved to: ${fileName}`,
+        logType: 'success'
+    });
 
     // Save detailed data to JSON
     const jsonFilePath = await saveVATDataToJSON(companyData, downloadPath, progressCallback);
@@ -1257,6 +1305,153 @@ function highlightCells(row, startCol, endCol, color, bold = false) {
             cell.font = { bold: true };
         }
     }
+}
+
+// Helper function to safely check if table exists
+async function safeTableCheck(page2, locator, timeout = 200) {
+    try {
+        await page2.waitForSelector(locator, { timeout });
+        return await page2.locator(locator);
+    } catch (error) {
+        return null;
+    }
+}
+
+// Helper function to add "Missing" row when table is not found
+function addMissingRow(worksheet, sectionName, monthYear) {
+    const monthYearRow = worksheet.addRow(["", "", `${monthYear}`]);
+    highlightCells(monthYearRow, "C", "M", "FF5DFFC9", true);
+
+    const missingRow = worksheet.addRow(["", "", "", "", `${sectionName} - Missing`]);
+    highlightCells(missingRow, "C", "M", "FFFF9999", true);
+    worksheet.addRow();
+}
+
+// Extract detailed section data in original format - matching FILED RETURNS VAT - MAIN.js
+async function extractDetailedSectionDataOriginalFormat(
+    page2,
+    sectionWorksheets,
+    mainWorksheet, // Optional - can be null if not using main summary sheet
+    company,
+    month,
+    year,
+    cleanDate,
+    periodKey,
+    companyNameRowAdded,
+    progressCallback
+) {
+    // Configure page for maximum data display
+    await page2.evaluate(() => {
+        const changeSelectOptions = () => {
+            const selectElements = document.querySelectorAll(".ui-pg-selbox");
+            selectElements.forEach(selectElement => {
+                Array.from(selectElement.options).forEach(option => {
+                    if (option.text === "20") {
+                        option.value = "20000";
+                    }
+                });
+            });
+        };
+        changeSelectOptions();
+    });
+
+    const selectElements = await page2.$$(".ui-pg-selbox");
+    for (const selectElement of selectElements) {
+        try {
+            await selectElement.click();
+            await page2.keyboard.press("ArrowDown");
+            await page2.keyboard.press("Enter");
+        } catch (error) {
+            // Continue
+        }
+    }
+
+    try {
+        await page2.locator("#pagersch5Tbl_center > table > tbody > tr > td:nth-child(8) > select").selectOption("20");
+    } catch (error) {
+        // Continue
+    }
+
+    // TABLE LOCATORS - using safe checking
+    const sectionBTableLocator = await safeTableCheck(page2, "#gridGeneralRateSalesDtlsTbl");
+    const sectionB2TableLocator = await safeTableCheck(page2, "#GeneralRateSalesDtlsTbl");
+    const sectionETableLocator = await safeTableCheck(page2, "#gridSch4Tbl");
+    const sectionFTableLocator = await safeTableCheck(page2, "#gview_gridsch5Tbl");
+    const sectionF2TableLocator = await safeTableCheck(page2, "#sch5Tbl");
+    const sectionK3TableLocator = await safeTableCheck(page2, "#gridVoucherDtlTbl");
+    const sectionMTableLocator = await safeTableCheck(page2, "#viewReturnVat > table > tbody > tr:nth-child(7) > td > table:nth-child(3)");
+    const sectionNTableLocator = await safeTableCheck(page2, "#viewReturnVat > table > tbody > tr:nth-child(7) > td > table:nth-child(5)");
+    const sectionOTableLocator = await safeTableCheck(page2, "#viewReturnVat > table > tbody > tr:nth-child(8) > td > table.panelGrid.tablerowhead");
+
+    // Process all sections using original format logic
+    const sections = [
+        { locator: sectionFTableLocator, key: 'sectionF', name: 'Section F', headers: ["", "", "Type of Purchases", "PIN of Supplier", "Name of Supplier", "Invoice Date", "Invoice Number", "Description of Goods / Services", "Custom Entry Number", "Taxable Value (Ksh)", "Amount of VAT (Ksh) (Taxable Value * VAT Rate%)", "Relevant Invoice Number", "Relevant Invoice Date"], highlightRange: ["C", "M"] },
+        { locator: sectionBTableLocator, key: 'sectionB', name: 'Section B', headers: ["", "", "PIN of Purchaser", "Name of Purchaser", "ETR Serial Number", "Invoice Date", "Invoice Number", "Description of Goods / Services", "Taxable Value (Ksh)", "Amount of VAT (Ksh) (Taxable Value * VAT Rate%)", "Relevant Invoice Number", "Relevant Invoice Date"], highlightRange: ["C", "L"] },
+        { locator: sectionB2TableLocator, key: 'sectionB2', name: 'Section B2', headers: ["", "", "Description", "Taxable Value (Ksh)", "Amount of VAT (Ksh)(Taxable Value*VAT Rate%)"], highlightRange: ["C", "G"] },
+        { locator: sectionETableLocator, key: 'sectionE', name: 'Section E', headers: ["", "", "PIN of Purchaser", "Name of Purchaser", "ETR Serial Number", "Invoice Date", "Invoice Number", "Description of Goods / Services", "Sales Value (Ksh)"], highlightRange: ["C", "I"] },
+        { locator: sectionF2TableLocator, key: 'sectionF2', name: 'Section F2', headers: ["", "", "Description", "Taxable Value (Ksh)", "Amount of VAT (Ksh) (Taxable Value * VAT Rate%)"], highlightRange: ["C", "G"] },
+        { locator: sectionK3TableLocator, key: 'sectionK3', name: 'Section K3', headers: ["", "", "Credit Adjustment Voucher/Inventory Approval Order Number", "Date of Voucher", "Amount"], highlightRange: ["C", "G"] },
+        { locator: sectionMTableLocator, key: 'sectionM', name: 'Section M', headers: ["", "", "Sr.No.", "Details of Sales", "Amount (Excl. VAT) (Ksh)", "Rate (%)", "Amount of Output VAT (Ksh)"], highlightRange: ["C", "G"] },
+        { locator: sectionNTableLocator, key: 'sectionN', name: 'Section N', headers: ["", "", "Sr.No.", "Details of Purchases", "Amount (Excl. VAT) (Ksh)", "Rate (%)", "Amount of Input VAT (Ksh)"], highlightRange: ["C", "G"] },
+        { locator: sectionOTableLocator, key: 'sectionO', name: 'Section O', headers: ["", "", "Sr.No.", "Descriptions", "Amount (Ksh)"], highlightRange: ["C", "E"] }
+    ];
+
+    for (const section of sections) {
+        const worksheet = sectionWorksheets[section.key].worksheet;
+        
+        if (section.locator) {
+            // Add company name (once per section per company)
+            const companyNameRow = worksheet.addRow(["", `${company.name}`, `Extraction Date: ${formattedDateTime}`]);
+            highlightCells(companyNameRow, "B", "M", "FFADD8E6", true);
+            
+            // Add month/year row
+            const monthYearRow = worksheet.addRow(["", "", `${getMonthName(month)} ${year}`]);
+            highlightCells(monthYearRow, "C", "M", "FF5DFFC9", true);
+
+            try {
+                const tableContent = await section.locator.evaluate(table => {
+                    const rows = Array.from(table.querySelectorAll("tr"));
+                    return rows.map(row => {
+                        const cells = Array.from(row.querySelectorAll("td"));
+                        return cells.map(cell => cell.innerText.trim());
+                    });
+                });
+
+                if (tableContent.length <= 1) {
+                    const noRecordsRow = worksheet.addRow(["", "", "", "", "No records found"]);
+                    highlightCells(noRecordsRow, section.highlightRange[0], section.highlightRange[1], "FFFF0000", true);
+                } else {
+                    const headerRow = worksheet.addRow(section.headers);
+                    highlightCells(headerRow, section.highlightRange[0], section.highlightRange[1], "FFADD8E", true);
+
+                    tableContent
+                        .filter(row => row.some(cell => cell.trim() !== ""))
+                        .forEach(row => {
+                            if (section.key === 'sectionF' && row.length >= 11) {
+                                const jValue = Number(row[9]?.replace(/,/g, '') || 0);
+                                const kValue = Number(row[10]?.replace(/,/g, '') || 0);
+                                worksheet.addRow(["", "", ...row.slice(0, 9), jValue, kValue, ...row.slice(11)]);
+                            } else {
+                                worksheet.addRow(["", "", ...row]);
+                            }
+                        });
+                }
+            } catch (error) {
+                progressCallback({ log: `Error extracting ${section.name}: ${error.message}`, logType: 'error' });
+                const errorRow = worksheet.addRow(["", "", "", "", `${section.name} - Error extracting data`]);
+                highlightCells(errorRow, section.highlightRange[0], section.highlightRange[1], "FFFF9999", true);
+            }
+            worksheet.addRow();
+        } else {
+            addMissingRow(worksheet, section.name, `${getMonthName(month)} ${year}`);
+        }
+    }
+
+    // Add summary to main worksheet
+    mainWorksheet.addRow(["", "", "", "", "All sections extracted successfully"]);
+    mainWorksheet.addRow();
+
+    progressCallback({ log: `Processed ${periodKey} - All sections extracted` });
 }
 
 module.exports = {

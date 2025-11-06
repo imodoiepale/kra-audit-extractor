@@ -684,7 +684,7 @@ function updateValidationDisplay(result) {
 }
 
 
-// Display manufacturer details
+// Display manufacturer details in comprehensive table format
 function displayManufacturerDetails(data) {
     if (!elements.manufacturerInfo) return;
 
@@ -692,35 +692,128 @@ function displayManufacturerDetails(data) {
     const business = data.manBusinessRDtlDTO || {};
     const contact = data.manContactRDtlDTO || {};
     const address = data.manAddRDtlDTO || {};
+    const authorization = data.manAuthDTO || {};
+    const disclaimer = data.manDisclaimerDtlDTO || {};
 
-    elements.manufacturerInfo.innerHTML = `
-        <div class="details-grid">
-            <div class="detail-item">
-                <span class="detail-label">Manufacturer Name:</span>
-                <span class="detail-value">${basic.manufacturerName || 'N/A'}</span>
+    // Build comprehensive details array with ALL available fields
+    const detailsSections = [
+        {
+            category: 'Basic Information',
+            items: [
+                { label: 'Manufacturer Name', value: basic.manufacturerName },
+                { label: 'Business Registration No.', value: basic.manufacturerBrNo },
+                { label: 'Manufacturer Code', value: basic.manufacturerCode },
+                { label: 'Manufacturer Type', value: basic.manufacturerType },
+                { label: 'Registration Status', value: basic.registrationStatus },
+                { label: 'Effective Date', value: basic.effectiveDate }
+            ]
+        },
+        {
+            category: 'Business Details',
+            items: [
+                { label: 'Business Name', value: business.businessName },
+                { label: 'Business Registration Certificate No.', value: business.businessRegCertNo },
+                { label: 'Business Registration Date', value: business.businessRegDate },
+                { label: 'Business Commencement Date', value: business.businessComDate },
+                { label: 'Nature of Business', value: business.natureOfBusiness },
+                { label: 'Business Type', value: business.businessType },
+                { label: 'Business Category', value: business.businessCategory }
+            ]
+        },
+        {
+            category: 'Contact Information',
+            items: [
+                { label: 'Mobile Number', value: contact.mobileNo },
+                { label: 'Telephone Number', value: contact.telephoneNo },
+                { label: 'Fax Number', value: contact.faxNo },
+                { label: 'Main Email', value: contact.mainEmail },
+                { label: 'Secondary Email', value: contact.secondaryEmail },
+                { label: 'Website', value: contact.website }
+            ]
+        },
+        {
+            category: 'Physical Address',
+            items: [
+                { label: 'Building Name', value: address.buildingName },
+                { label: 'Building Number', value: address.buldgNo },
+                { label: 'Floor Number', value: address.floorNo },
+                { label: 'Room Number', value: address.roomNo },
+                { label: 'Street/Road', value: address.streetRoad },
+                { label: 'City/Town', value: address.cityTown },
+                { label: 'County', value: address.county },
+                { label: 'Sub-County', value: address.subCounty },
+                { label: 'District', value: address.district },
+                { label: 'Tax Area Locality', value: address.taxAreaLocality },
+                { label: 'LR Number', value: address.lrNo },
+                { label: 'Plot Number', value: address.plotNo },
+                { label: 'Landmark', value: address.landmark },
+                { label: 'Descriptive Address', value: address.descriptiveAddress }
+            ]
+        },
+        {
+            category: 'Postal Address',
+            items: [
+                { label: 'PO Box', value: address.poBox },
+                { label: 'Postal Code', value: address.postalCode },
+                { label: 'Town', value: address.postalTown }
+            ]
+        },
+        {
+            category: 'Authorization Details',
+            items: [
+                { label: 'Authorization Number', value: authorization.authorizationNo },
+                { label: 'Authorization Date', value: authorization.authorizationDate },
+                { label: 'Authorization Status', value: authorization.authorizationStatus },
+                { label: 'Expiry Date', value: authorization.expiryDate },
+                { label: 'Renewal Date', value: authorization.renewalDate }
+            ]
+        }
+    ];
+
+    // Build HTML with comprehensive table
+    let html = '<div class="manufacturer-details-container" style="max-height: 600px; overflow-y: auto;">';
+    
+    detailsSections.forEach(section => {
+        html += `
+            <div class="details-section" style="margin-bottom: 20px;">
+                <h4 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                    ${section.category}
+                </h4>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+                    <thead>
+                        <tr style="background-color: #f0f0f0;">
+                            <th style="padding: 10px; text-align: left; border: 1px solid #ddd; width: 40%;">Field</th>
+                            <th style="padding: 10px; text-align: left; border: 1px solid #ddd; width: 60%;">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        section.items.forEach((item, index) => {
+            const value = item.value || 'N/A';
+            const bgColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
+            const valueColor = value === 'N/A' ? '#999' : '#333';
+            const valueStyle = value === 'N/A' ? 'font-style: italic;' : '';
+            
+            html += `
+                <tr style="background-color: ${bgColor};">
+                    <td style="padding: 8px 10px; border: 1px solid #ddd; font-weight: 500;">${item.label}</td>
+                    <td style="padding: 8px 10px; border: 1px solid #ddd; color: ${valueColor}; ${valueStyle}">${value}</td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
             </div>
-            <div class="detail-item">
-                <span class="detail-label">Business Reg. No:</span>
-                <span class="detail-value">${basic.manufacturerBrNo || 'N/A'}</span>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Business Name:</span>
-                <span class="detail-value">${business.businessName || 'N/A'}</span>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Mobile:</span>
-                <span class="detail-value">${contact.mobileNo || 'N/A'}</span>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Email:</span>
-                <span class="detail-value">${contact.mainEmail || 'N/A'}</span>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Address:</span>
-                <span class="detail-value">${address.descriptiveAddress || 'N/A'}</span>
-            </div>
-        </div>
-    `;
+        `;
+    });
+    
+    html += '</div>';
+    
+    elements.manufacturerInfo.innerHTML = html;
+    
     if (elements.manufacturerDetailsResult) {
         elements.manufacturerDetailsResult.classList.remove('hidden');
     }
