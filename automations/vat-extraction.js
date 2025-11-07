@@ -1,10 +1,10 @@
- const { chromium } = require('playwright');
+ const { chromium } = require("playwright");
+const ExcelJS = require("exceljs");
+const fs = require("fs").promises;
+const path = require("path");
+const os = require("os");
 const { createWorker } = require('tesseract.js');
-const ExcelJS = require('exceljs');
-const path = require('path');
-const fs = require('fs').promises;
 const SharedWorkbookManager = require('./shared-workbook-manager');
-const os = require('os');
 
 // Constants and date formatting
 const now = new Date();
@@ -224,9 +224,9 @@ async function loginToKRA(page, company, progressCallback) {
 
     progressCallback({ log: 'Solving captcha...' });
 
-    const image = await page.waitForSelector("#captcha_img");
+    await page.waitForSelector("#captcha_img");
     const imagePath = path.join(os.tmpdir(), `ocr_vat_${company.pin}.png`);
-    await image.screenshot({ path: imagePath });
+    await page.locator("#captcha_img").first().screenshot({ path: imagePath });
 
     const worker = await createWorker('eng', 1);
     let result;
@@ -1250,14 +1250,16 @@ async function createVATSummaryReport(extractedData, company, downloadPath) {
 }
 
 async function solveCaptcha(page) {
-    const imagePath = path.join(__dirname, '..', 'temp', `captcha_${Date.now()}.png`);
+    // Use system temp directory like agent-checker (more reliable in production)
+    const tempDir = path.join(os.tmpdir(), 'KRA');
+    const imagePath = path.join(tempDir, `captcha_vat_${Date.now()}.png`);
     
     // Ensure temp directory exists
-    await fs.mkdir(path.dirname(imagePath), { recursive: true });
+    await fs.mkdir(tempDir, { recursive: true });
 
     try {
-        const image = await page.waitForSelector("#captcha_img", { timeout: 10000 });
-        await image.screenshot({ path: imagePath });
+        await page.waitForSelector("#captcha_img", { timeout: 10000 });
+        await page.locator("#captcha_img").first().screenshot({ path: imagePath });
 
         const worker = await createWorker('eng', 1);
         const ret = await worker.recognize(imagePath);

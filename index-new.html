@@ -6,6 +6,7 @@
     <title>KRA POST PORTUM TOOL</title>
     <link rel="stylesheet" href="styles-new.css">
     <link rel="stylesheet" href="toast-styles.css">
+    <link rel="stylesheet" href="automation-table-styles.css">
 </head>
 <body>
     <div class="app-container">
@@ -750,78 +751,145 @@
                             <h3>Run All Automations</h3>
                         </div>
                         <div class="card-body">
-                            <div class="checklist-grid">
-                                <label class="checkbox-card">
-                                    <input type="checkbox" id="includePasswordValidation" checked>
-                                    <div class="checkbox-content">
-                                        <span class="checkbox-icon">🔐</span>
-                                        <div>
-                                            <strong>Password Check</strong>
-                                            <small>Validate credentials</small>
-                                        </div>
+                            <!-- Credentials Display Section -->
+                            <div class="credentials-display">
+                                <h4>📋 Current Credentials</h4>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                                    <div class="form-group">
+                                        <label for="runAllPinDisplay">KRA PIN</label>
+                                        <input type="text" id="runAllPinDisplay" class="form-control" readonly>
                                     </div>
-                                </label>
-                                
-                                <label class="checkbox-card">
-                                    <input type="checkbox" id="includeManufacturerDetails" checked>
-                                    <div class="checkbox-content">
-                                        <span class="checkbox-icon">📋</span>
-                                        <div>
-                                            <strong>Company Details</strong>
-                                            <small>Fetch business info</small>
-                                        </div>
+                                    <div class="form-group">
+                                        <label for="runAllPasswordDisplay">Password</label>
+                                        <input type="password" id="runAllPasswordDisplay" class="form-control" readonly>
                                     </div>
-                                </label>
-                                
-                                <label class="checkbox-card">
-                                    <input type="checkbox" id="includeObligationCheck" checked>
-                                    <div class="checkbox-content">
-                                        <span class="checkbox-icon">📝</span>
-                                        <div>
-                                            <strong>Obligation Check</strong>
-                                            <small>Check tax obligations</small>
-                                        </div>
+                                    <div class="form-group">
+                                        <label for="runAllCompanyDisplay">Company Name</label>
+                                        <input type="text" id="runAllCompanyDisplay" class="form-control" readonly>
                                     </div>
-                                </label>
-                                
-                                <label class="checkbox-card">
-                                    <input type="checkbox" id="includeLiabilities" checked>
-                                    <div class="checkbox-content">
-                                        <span class="checkbox-icon">💰</span>
-                                        <div>
-                                            <strong>Liabilities</strong>
-                                            <small>Extract liabilities data</small>
-                                        </div>
-                                    </div>
-                                </label>
-                                
-                                <label class="checkbox-card">
-                                    <input type="checkbox" id="includeVATReturns" checked>
-                                    <div class="checkbox-content">
-                                        <span class="checkbox-icon">📊</span>
-                                        <div>
-                                            <strong>VAT Returns</strong>
-                                            <small>Extract VAT data</small>
-                                        </div>
-                                    </div>
-                                </label>
-                                
-                                <label class="checkbox-card">
-                                    <input type="checkbox" id="includeGeneralLedger" checked>
-                                    <div class="checkbox-content">
-                                        <span class="checkbox-icon">📖</span>
-                                        <div>
-                                            <strong>General Ledger</strong>
-                                            <small>Extract transactions</small>
-                                        </div>
-                                    </div>
-                                </label>
+                                </div>
+                            </div>
+                            
+                            <div class="automation-table-container">
+                                <table class="automation-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 50px;">
+                                                <input type="checkbox" id="selectAllAutomations" checked>
+                                            </th>
+                                            <th style="width: 50px;"></th>
+                                            <th style="width: 200px;">Automation</th>
+                                            <th>Description</th>
+                                            <th style="width: 360px;">Date Range</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><input type="checkbox" class="automation-checkbox" id="includePasswordValidation" checked></td>
+                                            <td>🔐</td>
+                                            <td><strong>Password Validation</strong></td>
+                                            <td>Validate KRA credentials</td>
+                                            <td><span class="date-na">N/A</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" class="automation-checkbox" id="includeManufacturerDetails" checked></td>
+                                            <td>📋</td>
+                                            <td><strong>Manufacturer Details</strong></td>
+                                            <td>Fetch company information</td>
+                                            <td><span class="date-na">N/A</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" class="automation-checkbox" id="includeAgentStatus" checked></td>
+                                            <td>👤</td>
+                                            <td><strong>Agent Status Check</strong></td>
+                                            <td>Check withholding agent status</td>
+                                            <td><span class="date-na">N/A</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" class="automation-checkbox" id="includeObligationCheck" checked></td>
+                                            <td>📝</td>
+                                            <td><strong>Obligation Check</strong></td>
+                                            <td>Check tax obligations</td>
+                                            <td><span class="date-na">N/A</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" class="automation-checkbox" id="includeDirectorDetails" checked></td>
+                                            <td>👥</td>
+                                            <td><strong>Director Details</strong></td>
+                                            <td>Extract director information</td>
+                                            <td><span class="date-na">N/A</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" class="automation-checkbox" id="includeVATReturns" checked></td>
+                                            <td>📊</td>
+                                            <td><strong>VAT Returns</strong></td>
+                                            <td>Extract VAT returns data</td>
+                                            <td>
+                                                <div class="date-range-inputs">
+                                                    <select class="form-control-sm" id="vatRangeType">
+                                                        <option value="all">All Data</option>
+                                                        <option value="custom">Custom</option>
+                                                    </select>
+                                                    <div class="custom-range hidden" id="vatCustomRange">
+                                                        <input type="number" class="form-control-xs" placeholder="M" min="1" max="12" id="vatStartMonth">
+                                                        <input type="number" class="form-control-xs" placeholder="YYYY" min="2000" max="2099" id="vatStartYear">
+                                                        <span>to</span>
+                                                        <input type="number" class="form-control-xs" placeholder="M" min="1" max="12" id="vatEndMonth">
+                                                        <input type="number" class="form-control-xs" placeholder="YYYY" min="2000" max="2099" id="vatEndYear">
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" class="automation-checkbox" id="includeWhVatReturns" checked></td>
+                                            <td>📈</td>
+                                            <td><strong>WH VAT Returns</strong></td>
+                                            <td>Withholding VAT data</td>
+                                            <td>
+                                                <div class="date-range-inputs">
+                                                    <select class="form-control-sm" id="whVatRangeType">
+                                                        <option value="all">All Data</option>
+                                                        <option value="custom">Custom</option>
+                                                    </select>
+                                                    <div class="custom-range hidden" id="whVatCustomRange">
+                                                        <input type="number" class="form-control-xs" placeholder="M" min="1" max="12" id="whVatStartMonth">
+                                                        <input type="number" class="form-control-xs" placeholder="YYYY" min="2000" max="2099" id="whVatStartYear">
+                                                        <span>to</span>
+                                                        <input type="number" class="form-control-xs" placeholder="M" min="1" max="12" id="whVatEndMonth">
+                                                        <input type="number" class="form-control-xs" placeholder="YYYY" min="2000" max="2099" id="whVatEndYear">
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" class="automation-checkbox" id="includeGeneralLedger" checked></td>
+                                            <td>📖</td>
+                                            <td><strong>General Ledger</strong></td>
+                                            <td>Extract transaction ledger</td>
+                                            <td><span class="date-na">N/A</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" class="automation-checkbox" id="includeTaxCompliance" checked></td>
+                                            <td>📜</td>
+                                            <td><strong>Tax Compliance Certificate</strong></td>
+                                            <td>Download TCC certificate</td>
+                                            <td><span class="date-na">N/A</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" class="automation-checkbox" id="includeLiabilities" checked></td>
+                                            <td>💰</td>
+                                            <td><strong>Liabilities</strong></td>
+                                            <td>Extract liabilities data</td>
+                                            <td><span class="date-na">N/A</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
 
-                            <div class="button-group">
+                            <div class="button-group" style="margin-top: 20px;">
                                 <button id="runAllAutomations" class="btn btn-primary btn-lg" disabled>
                                     <span class="btn-icon">⚡</span>
-                                    Run Selected Extractions
+                                    Run Selected Automations
                                 </button>
                             </div>
                         </div>

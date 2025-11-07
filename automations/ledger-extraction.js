@@ -3,6 +3,7 @@ const { createWorker } = require('tesseract.js');
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs').promises;
+const os = require('os');
 const SharedWorkbookManager = require('./shared-workbook-manager');
 
 async function runLedgerExtraction(company, downloadPath, progressCallback) {
@@ -397,14 +398,16 @@ async function extractLedgerData(page, company, downloadPath, progressCallback) 
 }
 
 async function solveCaptcha(page) {
-    const imagePath = path.join(__dirname, '..', 'temp', `captcha_${Date.now()}.png`);
+    // Use system temp directory like agent-checker (more reliable in production)
+    const tempDir = path.join(os.tmpdir(), 'KRA');
+    const imagePath = path.join(tempDir, `captcha_ledger_${Date.now()}.png`);
     
     // Ensure temp directory exists
-    await fs.mkdir(path.dirname(imagePath), { recursive: true });
+    await fs.mkdir(tempDir, { recursive: true });
 
     try {
-        const image = await page.waitForSelector("#captcha_img", { timeout: 10000 });
-        await image.screenshot({ path: imagePath });
+        await page.waitForSelector("#captcha_img", { timeout: 10000 });
+        await page.locator("#captcha_img").first().screenshot({ path: imagePath });
 
         const worker = await createWorker('eng', 1);
         const ret = await worker.recognize(imagePath);

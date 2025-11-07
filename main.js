@@ -201,11 +201,11 @@ ipcMain.handle('run-ledger-extraction', async (event, { company, downloadPath })
   }
 });
 
-// Run all automations handler (optimized single session)
-ipcMain.handle('run-all-automations', async (event, { company, selectedAutomations, dateRange, downloadPath }) => {
+// Run all automations handler (uses individual automation modules)
+ipcMain.handle('run-all-automations', async (event, { company, selectedAutomations, vatDateRange, whVatDateRange, downloadPath }) => {
   try {
-    const { runAllAutomationsOptimized } = require('./automations/run-all-optimized');
-    return await runAllAutomationsOptimized(company, selectedAutomations, dateRange, downloadPath, (progress) => {
+    const { runAllAutomations } = require('./automations/run-all-automations');
+    return await runAllAutomations(company, selectedAutomations, vatDateRange, whVatDateRange, downloadPath, (progress) => {
       mainWindow.webContents.send('automation-progress', progress);
     });
   } catch (error) {

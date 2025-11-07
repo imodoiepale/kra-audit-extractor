@@ -255,6 +255,8 @@ body {
     flex-direction: column;
     min-height: 100vh;
     max-width: calc(100vw - var(--sidebar-width));
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 /* Page Header */
@@ -1307,6 +1309,8 @@ body {
 .data-section {
     padding: 24px;
     border-top: 1px solid var(--gray-200);
+    overflow-x: auto;
+    max-width: 100%;
 }
 
 .section-header {
@@ -1322,8 +1326,11 @@ body {
 
 .data-table {
     width: 100%;
+    min-width: 800px;
     border-collapse: collapse;
     font-size: 13px;
+    display: table;
+    table-layout: auto;
 }
 
 .data-table thead {
@@ -1505,12 +1512,16 @@ body {
 /* === Ledger Table Styling === */
 .ledger-table {
     border-collapse: collapse;
+    min-width: 1000px;
+    width: 100%;
+    table-layout: auto;
 }
 
 .ledger-table th,
 .ledger-table td {
     border: 1px solid var(--gray-300) !important;
     padding: 12px;
+    white-space: nowrap;
 }
 
 .ledger-table th:first-child,
@@ -1522,4 +1533,82 @@ body {
 .ledger-table .amount-cell {
     text-align: right;
     font-family: 'Courier New', monospace;
+}
+
+/* === Responsive Table Scrolling === */
+.data-section::-webkit-scrollbar,
+.table-container::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+
+.data-section::-webkit-scrollbar-track,
+.table-container::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 4px;
+}
+
+.data-section::-webkit-scrollbar-thumb,
+.table-container::-webkit-scrollbar-thumb {
+    background: var(--gray-400);
+    border-radius: 4px;
+}
+
+.data-section::-webkit-scrollbar-thumb:hover,
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-500);
+}
+
+/* Ensure extraction-results container is also scrollable */
+.extraction-results {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* Ensure all table wrappers are scrollable */
+.table-responsive,
+.table-container {
+    overflow-x: auto;
+    overflow-y: visible;
+    max-width: 100%;
+    border-radius: 8px;
+}
+
+/* Prevent text wrapping in table cells for better horizontal scrolling */
+.data-table th,
+.data-table td {
+    white-space: nowrap;
+}
+
+/* Allow certain columns to wrap if needed */
+.data-table td.particulars,
+.data-table td[data-wrap="true"] {
+    white-space: normal;
+    max-width: 300px;
+}
+
+/* Fullscreen responsive behavior */
+@media (min-width: 1920px) {
+    .data-table {
+        min-width: 1200px;
+    }
+    
+    .ledger-table {
+        min-width: 1400px;
+    }
+}
+
+/* Ensure summary cards don't cause overflow */
+.summary-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+    max-width: 100%;
+}
+
+.summary-card {
+    flex: 1 1 calc(33.333% - 16px);
+    min-width: 200px;
+    max-width: 100%;
 }

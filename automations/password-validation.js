@@ -3,6 +3,7 @@ const { createWorker } = require('tesseract.js');
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs').promises;
+const os = require('os');
 
 async function validateKRACredentials(pin, password, companyName, progressCallback) {
     let browser = null;
@@ -58,16 +59,20 @@ async function validateKRACredentials(pin, password, companyName, progressCallba
             };
         }
 
+        // Wait for PIN validation  
+        await page.waitForTimeout(1000);
+        
         try {
             await page.evaluate(() => {
-                CheckPIN();
+                if (typeof CheckPIN === 'function') {
+                    CheckPIN();
+                }
             });
         } catch (error) {
-            return {
-                success: true,
-                status: "Error",
-                message: "Invalid PIN format"
-            };
+            progressCallback({
+                log: 'CheckPIN function not available, continuing...',
+                logType: 'warning'
+            });
         }
 
         // Enter password
@@ -107,18 +112,26 @@ async function validateKRACredentials(pin, password, companyName, progressCallba
         };
 
     } catch (error) {
+        console.error('[Password Validation] Error:', error);
         progressCallback({
             log: `Validation error: ${error.message}`,
             logType: 'error'
         });
 
+        // Keep browser open for 5 seconds in case of error so user can see what happened
+        if (page) {
+            await page.waitForTimeout(5000).catch(() => {});
+        }
+
         return {
             success: false,
-            error: error.message
+            error: error.message,
+            stack: error.stack
         };
 
     } finally {
         // Cleanup
+        console.log('[Password Validation] Cleaning up browser resources...');
         if (page) await page.close().catch(() => {});
         if (context) await context.close().catch(() => {});
         if (browser) await browser.close().catch(() => {});
@@ -126,17 +139,30 @@ async function validateKRACredentials(pin, password, companyName, progressCallba
 }
 
 async function solveCaptcha(page, progressCallback) {
-    const imagePath = path.join(__dirname, '..', 'temp', `captcha_${Date.now()}.png`);
+    // Use system temp directory like agent-checker (more reliable in production)
+    const tempDir = path.join(os.tmpdir(), 'KRA');
+    const imagePath = path.join(tempDir, `captcha_password_${Date.now()}.png`);
+    
+    console.log('[CAPTCHA Solver] Starting captcha solving...');
+    console.log('[CAPTCHA Solver] Image path:', imagePath);
     
     // Ensure temp directory exists
-    await fs.mkdir(path.dirname(imagePath), { recursive: true });
+    await fs.mkdir(tempDir, { recursive: true });
 
     try {
-        const image = await page.waitForSelector("#captcha_img", { timeout: 10000 });
-        await image.screenshot({ path: imagePath });
+        console.log('[CAPTCHA Solver] Waiting for captcha image selector...');
+        await page.waitForSelector("#captcha_img", { timeout: 10000 });
+        
+        console.log('[CAPTCHA Solver] Taking screenshot...');
+        await page.locator("#captcha_img").first().screenshot({ path: imagePath });
+        console.log('[CAPTCHA Solver] Screenshot saved');
 
+        console.log('[CAPTCHA Solver] Creating Tesseract worker...');
         const worker = await createWorker('eng', 1);
+        console.log('[CAPTCHA Solver] Worker created, recognizing image...');
+        
         const ret = await worker.recognize(imagePath);
+        console.log('[CAPTCHA Solver] Recognition complete');
         
         const text1 = ret.data.text.slice(0, -1);
         const text = text1.slice(0, -1);
@@ -156,17 +182,25 @@ async function solveCaptcha(page, progressCallback) {
         }
 
         await worker.terminate();
+        console.log('[CAPTCHA Solver] Worker terminated');
         
         // Clean up temp file
-        await fs.unlink(imagePath).catch(() => {});
+        try {
+            await fs.unlink(imagePath);
+            console.log('[CAPTCHA Solver] Deleted temp image:', imagePath);
+        } catch (error) {
+            console.error('[CAPTCHA Solver] Error deleting temp image:', error.message);
+        }
 
         progressCallback({
             log: `CAPTCHA solved: ${numbers[0]} ${text.includes("+") ? "+" : "-"} ${numbers[1]} = ${result}`
         });
 
+        console.log('[CAPTCHA Solver] CAPTCHA result:', result.toString());
         return result.toString();
 
     } catch (error) {
+        console.error('[CAPTCHA Solver] Error:', error);
         // Clean up temp file on error
         await fs.unlink(imagePath).catch(() => {});
         throw error;

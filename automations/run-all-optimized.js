@@ -342,9 +342,9 @@ async function loginToKRA(page, company, progressCallback) {
     await page.waitForTimeout(1500);
     progressCallback({ log: 'Solving captcha...' });
 
-    const image = await page.waitForSelector("#captcha_img");
+    await page.waitForSelector("#captcha_img");
     const imagePath = path.join(os.tmpdir(), `ocr_${company.pin}.png`);
-    await image.screenshot({ path: imagePath });
+    await page.locator("#captcha_img").first().screenshot({ path: imagePath });
 
     const worker = await createWorker('eng', 1);
     let result;
@@ -383,7 +383,7 @@ async function loginToKRA(page, company, progressCallback) {
             attempts++;
             if (attempts >= 5) throw new Error('Failed to solve captcha after multiple attempts.');
             await page.waitForTimeout(1000);
-            await image.screenshot({ path: imagePath });
+            await page.locator("#captcha_img").first().screenshot({ path: imagePath });
         }
     }
     await worker.terminate();
@@ -416,9 +416,11 @@ async function loginToKRA(page, company, progressCallback) {
         return loginToKRA(page, company, progressCallback);
     }
 
+    await page.goto("https://itax.kra.go.ke/KRA-Portal/");
     // If no main menu and no invalid login message, something else went wrong
     progressCallback({ log: 'Login failed - unknown error, retrying...' });
     return loginToKRA(page, company, progressCallback);
+    
 }
 
 // Optimized automation functions (using existing browser session)
@@ -431,9 +433,9 @@ async function runObligationCheckOptimized(page, company, downloadPath, progress
     await page.waitForTimeout(1000);
 
     // Solve captcha and check obligations
-    const image = await page.waitForSelector("#captcha_img");
+    await page.waitForSelector("#captcha_img");
     const imagePath = path.join(os.tmpdir(), "ocr_obligation.png");
-    await image.screenshot({ path: imagePath });
+    await page.locator("#captcha_img").first().screenshot({ path: imagePath });
 
     const worker = await createWorker('eng', 1);
     const ret = await worker.recognize(imagePath);

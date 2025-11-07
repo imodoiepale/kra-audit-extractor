@@ -56,9 +56,12 @@ async function runWhVatExtraction(company, dateRange, downloadPath, progressCall
         await page.waitForTimeout(1500);
         progressCallback({ log: 'Solving captcha...' });
 
-        const image = await page.waitForSelector("#captcha_img");
-        const imagePath = path.join(downloadPath, `ocr_wh_vat_${company.pin}.png`);
-        await image.screenshot({ path: imagePath });
+        await page.waitForSelector("#captcha_img");
+        // Use system temp directory like agent-checker (more reliable in production)
+        const tempDir = path.join(os.tmpdir(), 'KRA');
+        await fs.mkdir(tempDir, { recursive: true });
+        const imagePath = path.join(tempDir, `captcha_whvat_${Date.now()}.png`);
+        await page.locator("#captcha_img").first().screenshot({ path: imagePath });
         
         const worker = await createWorker('eng', 1);
         let result;
@@ -95,7 +98,7 @@ async function runWhVatExtraction(company, dateRange, downloadPath, progressCall
                 attempts++;
                 if (attempts >= 5) throw new Error('Failed to solve captcha after multiple attempts.');
                 await page.waitForTimeout(1000);
-                await image.screenshot({ path: imagePath });
+                await page.locator("#captcha_img").first().screenshot({ path: imagePath });
             }
         }
         await worker.terminate();

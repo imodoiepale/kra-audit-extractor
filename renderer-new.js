@@ -93,13 +93,45 @@ const elements = {
     runLedgerExtraction: document.getElementById('runLedgerExtraction'),
     
     // Step 8: Run All
+    selectAllAutomations: document.getElementById('selectAllAutomations'),
+    runAllPinDisplay: document.getElementById('runAllPinDisplay'),
+    runAllPasswordDisplay: document.getElementById('runAllPasswordDisplay'),
+    runAllCompanyDisplay: document.getElementById('runAllCompanyDisplay'),
     includePasswordValidation: document.getElementById('includePasswordValidation'),
     includeManufacturerDetails: document.getElementById('includeManufacturerDetails'),
+    includeAgentStatus: document.getElementById('includeAgentStatus'),
     includeObligationCheck: document.getElementById('includeObligationCheck'),
-    includeLiabilities: document.getElementById('includeLiabilities'),
+    includeDirectorDetails: document.getElementById('includeDirectorDetails'),
     includeVATReturns: document.getElementById('includeVATReturns'),
+    includeWhVatReturns: document.getElementById('includeWhVatReturns'),
     includeGeneralLedger: document.getElementById('includeGeneralLedger'),
+    includeTaxCompliance: document.getElementById('includeTaxCompliance'),
+    includeLiabilities: document.getElementById('includeLiabilities'),
     runAllAutomations: document.getElementById('runAllAutomations'),
+    
+    // VAT Date Range
+    vatRangeType: document.getElementById('vatRangeType'),
+    vatCustomRange: document.getElementById('vatCustomRange'),
+    vatStartMonth: document.getElementById('vatStartMonth'),
+    vatStartYear: document.getElementById('vatStartYear'),
+    vatEndMonth: document.getElementById('vatEndMonth'),
+    vatEndYear: document.getElementById('vatEndYear'),
+    
+    // WH VAT Date Range
+    whVatRangeType: document.getElementById('whVatRangeType'),
+    whVatCustomRange: document.getElementById('whVatCustomRange'),
+    whVatStartMonth: document.getElementById('whVatStartMonth'),
+    whVatStartYear: document.getElementById('whVatStartYear'),
+    whVatEndMonth: document.getElementById('whVatEndMonth'),
+    whVatEndYear: document.getElementById('whVatEndYear'),
+    
+    // Run All Date Range
+    runAllDateRange: document.getElementsByName('runAllDateRange'),
+    runAllCustomDateInputs: document.getElementById('runAllCustomDateInputs'),
+    runAllStartMonth: document.getElementById('runAllStartMonth'),
+    runAllStartYear: document.getElementById('runAllStartYear'),
+    runAllEndMonth: document.getElementById('runAllEndMonth'),
+    runAllEndYear: document.getElementById('runAllEndYear'),
     
     // Global elements
     progressSection: document.getElementById('progressSection'),
@@ -221,6 +253,21 @@ function setupEventListeners() {
     
     if (elements.runWhVATExtraction) {
         elements.runWhVATExtraction.addEventListener('click', runWhVATExtraction);
+    }
+    
+    // Run All - Select All Checkbox
+    if (elements.selectAllAutomations) {
+        elements.selectAllAutomations.addEventListener('change', toggleAllAutomations);
+    }
+    
+    // Run All - VAT Date Range Dropdown
+    if (elements.vatRangeType) {
+        elements.vatRangeType.addEventListener('change', toggleVATRangeInputs);
+    }
+    
+    // Run All - WH VAT Date Range Dropdown
+    if (elements.whVatRangeType) {
+        elements.whVatRangeType.addEventListener('change', toggleWhVATRangeInputs);
     }
     
     // Step 5: General Ledger
@@ -475,6 +522,17 @@ function updateUIState() {
     const hasCompanyData = appState.companyData !== null;
     const hasValidation = appState.hasValidation;
     
+    // Update Run All credentials display
+    if (appState.companyData) {
+        if (elements.runAllPinDisplay) elements.runAllPinDisplay.value = appState.companyData.pin || '';
+        if (elements.runAllPasswordDisplay) elements.runAllPasswordDisplay.value = appState.companyData.password || '';
+        if (elements.runAllCompanyDisplay) elements.runAllCompanyDisplay.value = appState.companyData.name || '';
+    } else {
+        if (elements.runAllPinDisplay) elements.runAllPinDisplay.value = '';
+        if (elements.runAllPasswordDisplay) elements.runAllPasswordDisplay.value = '';
+        if (elements.runAllCompanyDisplay) elements.runAllCompanyDisplay.value = '';
+    }
+    
     // Step 1 buttons
     if (elements.fetchCompanyDetails) {
         elements.fetchCompanyDetails.disabled = !hasCredentials || appState.isProcessing;
@@ -674,6 +732,28 @@ function getVATDateRange() {
     }
 }
 
+// Get Run All date range from form
+function getRunAllDateRange() {
+    const selectedOption = document.querySelector('input[name="runAllDateRange"]:checked')?.value;
+    
+    if (selectedOption === 'custom') {
+        const startYear = parseInt(elements.runAllStartYear?.value) || new Date().getFullYear();
+        const startMonth = parseInt(elements.runAllStartMonth?.value) || 1;
+        const endYear = parseInt(elements.runAllEndYear?.value) || new Date().getFullYear();
+        const endMonth = parseInt(elements.runAllEndMonth?.value) || 12;
+        
+        return {
+            type: 'custom',
+            startYear: startYear,
+            startMonth: startMonth,
+            endYear: endYear,
+            endMonth: endMonth
+        };
+    } else {
+        return { type: 'all' };
+    }
+}
+
 // Step 1: Fetch company details from manufacturer API
 async function fetchCompanyDetails() {
     console.log('Fetch Company Details clicked');
@@ -695,7 +775,7 @@ async function fetchCompanyDetails() {
         
         console.log('Calling fetch-manufacturer-details with PIN:', pin);
 
-                const company = {
+        const company = {
             pin: pin,
             password: elements.kraPassword?.value.trim()
         };
@@ -1938,6 +2018,95 @@ function toggleWhVATDateInputs() {
     }
 }
 
+// Run All: Toggle custom date inputs
+function toggleRunAllDateInputs() {
+    const selectedRange = document.querySelector('input[name="runAllDateRange"]:checked')?.value;
+    if (elements.runAllCustomDateInputs) {
+        if (selectedRange === 'custom') {
+            elements.runAllCustomDateInputs.classList.remove('hidden');
+        } else {
+            elements.runAllCustomDateInputs.classList.add('hidden');
+        }
+    }
+}
+
+// Run All: Select/Deselect All Automations
+function toggleAllAutomations() {
+    const isChecked = elements.selectAllAutomations?.checked || false;
+    const checkboxes = document.querySelectorAll('.automation-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = isChecked;
+    });
+}
+
+// Run All: Toggle VAT custom date range inputs
+function toggleVATRangeInputs() {
+    const rangeType = elements.vatRangeType?.value;
+    if (elements.vatCustomRange) {
+        if (rangeType === 'custom') {
+            elements.vatCustomRange.classList.remove('hidden');
+        } else {
+            elements.vatCustomRange.classList.add('hidden');
+        }
+    }
+}
+
+// Run All: Toggle WH VAT custom date range inputs
+function toggleWhVATRangeInputs() {
+    const rangeType = elements.whVatRangeType?.value;
+    if (elements.whVatCustomRange) {
+        if (rangeType === 'custom') {
+            elements.whVatCustomRange.classList.remove('hidden');
+        } else {
+            elements.whVatCustomRange.classList.add('hidden');
+        }
+    }
+}
+
+// Run All: Get individual VAT date range
+function getIndividualVATDateRange() {
+    const rangeType = elements.vatRangeType?.value;
+    
+    if (rangeType === 'custom') {
+        const startYear = parseInt(elements.vatStartYear?.value) || new Date().getFullYear();
+        const startMonth = parseInt(elements.vatStartMonth?.value) || 1;
+        const endYear = parseInt(elements.vatEndYear?.value) || new Date().getFullYear();
+        const endMonth = parseInt(elements.vatEndMonth?.value) || 12;
+        
+        return {
+            type: 'custom',
+            startYear: startYear,
+            startMonth: startMonth,
+            endYear: endYear,
+            endMonth: endMonth
+        };
+    } else {
+        return { type: 'all' };
+    }
+}
+
+// Run All: Get individual WH VAT date range
+function getIndividualWhVATDateRange() {
+    const rangeType = elements.whVatRangeType?.value;
+    
+    if (rangeType === 'custom') {
+        const startYear = parseInt(elements.whVatStartYear?.value) || new Date().getFullYear();
+        const startMonth = parseInt(elements.whVatStartMonth?.value) || 1;
+        const endYear = parseInt(elements.whVatEndYear?.value) || new Date().getFullYear();
+        const endMonth = parseInt(elements.whVatEndMonth?.value) || 12;
+        
+        return {
+            type: 'custom',
+            startYear: startYear,
+            startMonth: startMonth,
+            endYear: endYear,
+            endMonth: endMonth
+        };
+    } else {
+        return { type: 'all' };
+    }
+}
+
 // WH VAT: Get date range from form
 function getWhVATDateRange() {
     const selectedRange = document.querySelector('input[name="whVatDateRange"]:checked')?.value;
@@ -2349,10 +2518,14 @@ async function runAllAutomations() {
     const selectedAutomations = {
         passwordValidation: elements.includePasswordValidation?.checked || false,
         manufacturerDetails: elements.includeManufacturerDetails?.checked || false,
+        agentStatus: elements.includeAgentStatus?.checked || false,
         obligationCheck: elements.includeObligationCheck?.checked || false,
-        liabilities: elements.includeLiabilities?.checked || false,
+        directorDetails: elements.includeDirectorDetails?.checked || false,
         vatReturns: elements.includeVATReturns?.checked || false,
-        generalLedger: elements.includeGeneralLedger?.checked || false
+        whVatReturns: elements.includeWhVatReturns?.checked || false,
+        generalLedger: elements.includeGeneralLedger?.checked || false,
+        taxCompliance: elements.includeTaxCompliance?.checked || false,
+        liabilities: elements.includeLiabilities?.checked || false
     };
     
     const hasSelected = Object.values(selectedAutomations).some(selected => selected);
@@ -2371,12 +2544,16 @@ async function runAllAutomations() {
         showProgressSection('Running selected automations...');
         
         const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
-        const dateRange = getVATDateRange(); // Get date range from form
+        
+        // Get individual date ranges for VAT and WH VAT
+        const vatDateRange = getIndividualVATDateRange();
+        const whVatDateRange = getIndividualWhVATDateRange();
         
         const result = await ipcRenderer.invoke('run-all-automations', {
             company: appState.companyData,
             selectedAutomations,
-            dateRange: dateRange,
+            vatDateRange: vatDateRange,
+            whVatDateRange: whVatDateRange,
             downloadPath: downloadPath
         });
         

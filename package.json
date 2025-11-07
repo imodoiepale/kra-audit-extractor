@@ -7,7 +7,7 @@
         "start": "electron .",
         "dev": "nodemon --watch . --exec electron . --dev",
         "watch": "nodemon --watch . --exec electron .",
-        "build": "electron-builder",
+        "build": "electron-builder --win --x64",
         "dist": "electron-builder --publish=never"
     },
     "keywords": [
@@ -32,30 +32,72 @@
         "tesseract.js": "^5.1.1"
     },
     "build": {
-        "appId": "com.yourcompany.kra-extractor",
-        "productName": "KRA Data Extractor",
+        "appId": "com.postportum.kra-extractor",
+        "productName": "KRA POST PORTUM TOOL",
         "directories": {
-            "output": "dist"
+            "output": "dist",
+            "buildResources": "assets"
         },
         "files": [
             "main.js",
-            "renderer.js",
-            "index.html",
-            "styles.css",
-            "extractor.js",
-            "node_modules/**/*"
+            "renderer-new.js",
+            "index-new.html",
+            "styles-new.css",
+            "toast-styles.css",
+            "automation-table-styles.css",
+            "config.json",
+            "tesseract-config.js",
+            "automations/**/*",
+            "node_modules/**/*",
+            "!node_modules/.cache",
+            "!node_modules/.bin"
+        ],
+        "extraResources": [
+            {
+                "from": "assets",
+                "to": "assets",
+                "filter": ["**/*"]
+            },
+            {
+                "from": "node_modules/tesseract.js/dist",
+                "to": "tesseract-dist"
+            },
+            {
+                "from": "node_modules/tesseract.js-core",
+                "to": "tesseract-core"
+            }
         ],
         "win": {
-            "target": "nsis",
-            "icon": "assets/icon.ico"
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": ["x64"]
+                },
+                {
+                    "target": "portable",
+                    "arch": ["x64"]
+                }
+            ],
+            "icon": "assets/icons/icon-512x512.png",
+            "publisherName": "POST PORTUM",
+            "requestedExecutionLevel": "requireAdministrator"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "KRA POST PORTUM TOOL"
         },
         "mac": {
             "target": "dmg",
-            "icon": "assets/icon.icns"
+            "icon": "assets/icon.icns",
+            "category": "public.app-category.business"
         },
         "linux": {
-            "target": "AppImage",
-            "icon": "assets/icon.png"
+            "target": ["AppImage", "deb"],
+            "icon": "assets/icon.png",
+            "category": "Office"
         }
     },
     "repository": {

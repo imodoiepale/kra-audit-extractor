@@ -1,5 +1,5 @@
 const { chromium } = require("playwright");
-const { createWorker } = require("tesseract.js");
+const { createWorker } = require('tesseract.js');
 const path = require("path");
 const os = require("os");
 
@@ -46,9 +46,9 @@ async function processCompanyData(company, page, progressCallback) {
             }
 
             progressCallback({ log: 'Solving captcha...' });
-            const image = await page.waitForSelector("#captcha_img");
+            await page.waitForSelector("#captcha_img");
             const imagePath = path.join(os.tmpdir(), "ocr_obligation.png");
-            await image.screenshot({ path: imagePath });
+            await page.locator("#captcha_img").first().screenshot({ path: imagePath });
 
             const worker = await createWorker('eng', 1);
             const ret = await worker.recognize(imagePath);
