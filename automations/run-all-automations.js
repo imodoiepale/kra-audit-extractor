@@ -1,10 +1,10 @@
 const { validateKRACredentials, exportPasswordValidationToSheet } = require('./password-validation');
 const { fetchManufacturerDetails, exportManufacturerToSheet } = require('./manufacturer-details');
 const { runObligationCheck, exportObligationToSheet } = require('./obligation-checker');
-const { runLedgerExtraction, exportLedgerToSheet } = require('./ledger-extraction');
+const { runLedgerExtraction } = require('./ledger-extraction');
 const { runVATExtraction } = require('./vat-extraction');
 const { runWhVatExtraction } = require('./wh-vat-extraction');
-const { extractCompanyAndDirectorDetails, exportDirectorDetailsToSheet } = require('./director-details-extraction');
+const { runDirectorDetailsExtraction } = require('./director-details-extraction');
 const SharedWorkbookManager = require('./shared-workbook-manager');
 
 /**
@@ -223,15 +223,10 @@ async function runAllAutomations(company, selectedAutomations, vatDateRange, whV
                 );
 
                 if (ledgerResult.success) {
-                    // Export to consolidated workbook
-                    await exportLedgerToSheet(
-                        workbookManager.workbook,
-                        'General Ledger',
-                        ledgerResult.data || []
-                    );
+                    // Ledger extraction handles its own export to consolidated workbook
                     results.successful.push('General Ledger');
-                    if (ledgerResult.fileName) {
-                        results.files.push(ledgerResult.fileName);
+                    if (ledgerResult.files) {
+                        results.files.push(...ledgerResult.files);
                     }
                     updateProgress('General Ledger', 'Completed');
                 } else {
@@ -253,18 +248,18 @@ async function runAllAutomations(company, selectedAutomations, vatDateRange, whV
                     progress: Math.round((completedAutomations / totalAutomations) * 100)
                 });
 
-                const directorResult = await extractCompanyAndDirectorDetails(
+                const directorResult = await runDirectorDetailsExtraction(
                     company,
+                    mainDownloadPath,
                     (data) => progressCallback({ ...data, stage: 'Director Details' })
                 );
 
                 if (directorResult.success) {
-                    await exportDirectorDetailsToSheet(
-                        workbookManager.workbook,
-                        'Director Details',
-                        directorResult
-                    );
+                    // Director details extraction handles its own export
                     results.successful.push('Director Details');
+                    if (directorResult.files) {
+                        results.files.push(...directorResult.files);
+                    }
                     updateProgress('Director Details', 'Completed');
                 } else {
                     results.failed.push({ name: 'Director Details', error: directorResult.error });

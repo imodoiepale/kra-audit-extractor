@@ -4,6 +4,7 @@ const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs').promises;
 const os = require('os');
+const { solveArithmetic, withCaptchaRetry, hasArithmeticError } = require('./captcha-retry-helper');
 
 async function validateKRACredentials(pin, password, companyName, progressCallback) {
     let browser = null;
@@ -84,8 +85,12 @@ async function validateKRACredentials(pin, password, companyName, progressCallba
             log: 'Solving CAPTCHA...'
         });
 
-        // Solve CAPTCHA
-        const captchaResult = await solveCaptcha(page, progressCallback);
+        // Solve CAPTCHA with retry logic
+        const captchaResult = await withCaptchaRetry(
+            async () => await solveCaptcha(page, progressCallback),
+            3,
+            progressCallback
+        );
         await page.type("#captcahText", captchaResult);
         await page.click("#loginButton");
 
@@ -172,14 +177,8 @@ async function solveCaptcha(page, progressCallback) {
             throw new Error("Unable to extract valid numbers from CAPTCHA");
         }
 
-        let result;
-        if (text.includes("+")) {
-            result = Number(numbers[0]) + Number(numbers[1]);
-        } else if (text.includes("-")) {
-            result = Number(numbers[0]) - Number(numbers[1]);
-        } else {
-            throw new Error("Unsupported arithmetic operator in CAPTCHA");
-        }
+        // Use helper function to solve arithmetic (supports +, -, *)
+        const result = solveArithmetic(text);
 
         await worker.terminate();
         console.log('[CAPTCHA Solver] Worker terminated');
