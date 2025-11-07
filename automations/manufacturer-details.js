@@ -344,7 +344,7 @@ async function exportManufacturerToExcel(data, pin, downloadPath) {
         });
 
         // Save file
-        const fileName = `Manufacturer_Details_${pin}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        const fileName = `MANUFACTURER_DETAILS_${pin}_${new Date().toISOString().split('T')[0]}.xlsx`;
         const filePath = path.join(downloadPath, fileName);
         await workbook.xlsx.writeFile(filePath);
 

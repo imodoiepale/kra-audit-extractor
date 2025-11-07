@@ -26,17 +26,6 @@ async function runLedgerExtraction(company, downloadPath, progressCallback) {
             log: `Company folder created: ${companyFolder}`
         });
 
-        // Create download folder
-        const now = new Date();
-        const formattedDateTime = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
-        const ledgerDownloadPath = path.join(downloadPath, `GENERAL-LEDGER-${formattedDateTime}`);
-        await fs.mkdir(ledgerDownloadPath, { recursive: true });
-
-        progressCallback({
-            progress: 5,
-            log: `Ledger download folder created: ${ledgerDownloadPath}`
-        });
-
         // Launch browser
         browser = await chromium.launch({
             headless: false,
@@ -102,7 +91,8 @@ async function runLedgerExtraction(company, downloadPath, progressCallback) {
         return {
             success: true,
             files: [savedWorkbook.fileName],
-            downloadPath: ledgerDownloadPath,
+            downloadPath: companyFolder,
+            companyFolder: companyFolder,
             recordCount: extractedData.recordCount,
             data: extractedData.data
         };
@@ -272,63 +262,85 @@ async function extractLedgerData(page, company, downloadPath, progressCallback) 
                 log: 'Extracting general ledger data...'
             });
 
-            const tableContent = await ledgerTable.evaluate(table => {
-                const rows = Array.from(table.querySelectorAll("tr"));
-                return rows.map(row => {
+            // Extract table headers and data dynamically
+            const tableData = await ledgerTable.evaluate(table => {
+                const headerRow = table.querySelector("thead tr") || table.querySelector("tr");
+                const headers = [];
+                
+                if (headerRow) {
+                    const headerCells = Array.from(headerRow.querySelectorAll("th, td"));
+                    headerCells.forEach(cell => {
+                        headers.push(cell.innerText.trim());
+                    });
+                }
+                
+                const dataRows = Array.from(table.querySelectorAll("tbody tr"));
+                const rows = dataRows.map(row => {
                     const cells = Array.from(row.querySelectorAll("td"));
                     return cells.map(cell => cell.innerText.trim());
                 });
+                
+                return { headers, rows };
             });
 
-            if (tableContent.length > 1) {
-                recordCount = tableContent.length - 1; // Subtract header row
+            const { headers, rows } = tableData;
+            
+            if (rows.length > 0) {
+                recordCount = rows.length;
                 
                 progressCallback({
-                    log: `Found ${recordCount} general ledger records`
+                    log: `Found ${recordCount} general ledger records with ${headers.length} columns`
                 });
 
-                // Add header
-                const headerRow = worksheet.addRow([
-                    "", "", "", "Sr.No.", "Tax Obligation", "Tax Period", "Transaction Date",
-                    "Reference Number", "Particulars", "Transaction Type", "Debit(Ksh)", "Credit(Ksh)"
-                ]);
-                highlightCells(headerRow, "D", "L", "FFC0C0C0", true);
+                // Add header (2 empty columns for spacing + all dynamic headers)
+                const headerRow = worksheet.addRow(["", "", ...headers]);
+                
+                // Calculate end column letter dynamically
+                const endColIndex = headers.length + 2; // +2 for the 2 empty columns
+                const endColLetter = String.fromCharCode(64 + endColIndex); // Convert to letter (C, D, E, etc.)
+                highlightCells(headerRow, "C", endColLetter, "FFC0C0C0", true);
 
-                // Add data and capture for UI display
-                tableContent
+                // Add data rows (2 empty columns + all data columns)
+                rows
                     .filter(row => row.some(cell => cell.trim() !== ""))
                     .forEach(row => {
                         const excelRow = worksheet.addRow(["", "", ...row]);
                         
-                        // Store data for UI display exactly as it appears
-                        extractedData.push({
-                            srNo: row[0] || '',
-                            taxObligation: row[1] || '',
-                            taxPeriod: row[2] || '',
-                            transactionDate: row[3] || '',
-                            referenceNumber: row[4] || '',
-                            particulars: row[5] || '',
-                            transactionType: row[6] || '',
-                            debit: row[7] || '',
-                            credit: row[8] || '',
+                        // Store data for UI display with dynamic column mapping
+                        const dataObject = {
                             isTotal: row[0] && row[0].toLowerCase().includes('total')
+                        };
+                        
+                        // Map each column dynamically
+                        headers.forEach((header, index) => {
+                            // Create safe property name from header
+                            const propName = header
+                                .toLowerCase()
+                                .replace(/[^a-z0-9]/g, '_')
+                                .replace(/_+/g, '_')
+                                .replace(/^_|_$/g, '') || `col_${index}`;
+                            dataObject[propName] = row[index] || '';
                         });
                         
-                        // Format number columns in Excel if they contain numeric data
-                        if (row.length >= 8) {
-                            const debitCell = excelRow.getCell(10); // Column J
-                            const creditCell = excelRow.getCell(11); // Column K
-                            
-                            if (row[7] && row[7] !== '-' && !isNaN(parseFloat(row[7].replace(/,/g, '')))) {
-                                debitCell.value = parseFloat(row[7].replace(/,/g, ''));
-                                debitCell.numFmt = '#,##0.00';
+                        // Keep original column values for backward compatibility
+                        dataObject.columns = row;
+                        dataObject.headers = headers;
+                        
+                        extractedData.push(dataObject);
+                        
+                        // Auto-detect and format numeric columns
+                        row.forEach((cellValue, colIndex) => {
+                            if (cellValue && cellValue !== '-') {
+                                const numValue = parseFloat(cellValue.replace(/,/g, ''));
+                                if (!isNaN(numValue) && cellValue.match(/[\d,]+\.?\d*/)) {
+                                    const excelColIndex = colIndex + 3; // +3 for 2 empty columns + 1-based indexing
+                                    const cell = excelRow.getCell(excelColIndex);
+                                    cell.value = numValue;
+                                    cell.numFmt = '#,##0.00';
+                                    cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                                }
                             }
-                            
-                            if (row[8] && row[8] !== '-' && !isNaN(parseFloat(row[8].replace(/,/g, '')))) {
-                                creditCell.value = parseFloat(row[8].replace(/,/g, ''));
-                                creditCell.numFmt = '#,##0.00';
-                            }
-                        }
+                        });
                     });
 
             } else {
@@ -347,33 +359,28 @@ async function extractLedgerData(page, company, downloadPath, progressCallback) 
         worksheet.addRow(["", "", "Error extracting general ledger data"]);
     }
 
-    // Auto-adjust column widths
+    // Auto-adjust column widths dynamically
+    worksheet.getColumn('A').width = 3;  // Empty
+    worksheet.getColumn('B').width = 3;  // Empty
+    
+    // Set widths for data columns dynamically
     worksheet.columns.forEach((column, columnIndex) => {
+        if (columnIndex < 2) return; // Skip the two empty columns
+        
         let maxLength = 0;
-        for (let rowIndex = 2; rowIndex <= worksheet.rowCount; rowIndex++) {
-            const cell = worksheet.getCell(rowIndex, columnIndex + 1);
+        column.eachCell({ includeEmpty: false }, cell => {
             const cellLength = cell.value ? cell.value.toString().length : 0;
             if (cellLength > maxLength) {
                 maxLength = cellLength;
             }
-        }
+        });
         
-        // Set appropriate column widths
-        if (columnIndex === 3) { // Sr. No.
-            column.width = 8;
-        } else if (columnIndex === 4) { // Tax Obligation
-            column.width = Math.max(20, maxLength + 2);
-        } else if (columnIndex === 8) { // Particulars
-            column.width = Math.max(40, maxLength + 2);
-        } else if (columnIndex >= 10) { // Debit/Credit columns
-            column.width = Math.max(15, maxLength + 2);
-        } else {
-            column.width = Math.max(12, maxLength + 2);
-        }
+        // Set width with reasonable min/max
+        column.width = Math.max(10, Math.min(maxLength + 2, 50));
     });
 
     // Save General Ledger file
-    const fileName = `General_Ledger_${company.pin}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `GENERAL_LEDGER_${company.pin}_${new Date().toISOString().split('T')[0]}.xlsx`;
     const filePath = path.join(downloadPath, fileName);
     await workbook.xlsx.writeFile(filePath);
     
@@ -460,13 +467,14 @@ async function exportLedgerToSheet(workbookManager, extractedData) {
     if (!extractedData || !extractedData.data || extractedData.data.length === 0) {
         worksheet.addRow(['', '', 'No general ledger records found']);
     } else {
-        // Add header
+        // Add header (2 empty columns to match format)
         const headers = [
             '', '', 'Sr.No.', 'Tax Obligation', 'Tax Period', 'Transaction Date',
             'Reference Number', 'Particulars', 'Transaction Type', 'Debit(Ksh)', 'Credit(Ksh)'
         ];
         const headerRow = worksheet.addRow(headers);
-        workbookManager.highlightCells(worksheet, headerRow.number, 'D', 'L', 'FFC0C0C0');
+        workbookManager.highlightCells(worksheet, headerRow.number, 'C', 'K', 'FFC0C0C0');
+        headerRow.getCell('C').font = { bold: true };
         headerRow.getCell('D').font = { bold: true };
         headerRow.getCell('E').font = { bold: true };
         headerRow.getCell('F').font = { bold: true };
@@ -475,7 +483,6 @@ async function exportLedgerToSheet(workbookManager, extractedData) {
         headerRow.getCell('I').font = { bold: true };
         headerRow.getCell('J').font = { bold: true };
         headerRow.getCell('K').font = { bold: true };
-        headerRow.getCell('L').font = { bold: true };
 
         // Add data
         extractedData.data.forEach((record, index) => {
@@ -519,8 +526,8 @@ async function exportLedgerToSheet(workbookManager, extractedData) {
             }
             
             // Format number columns
-            const debitCell = row.getCell('K');
-            const creditCell = row.getCell('L');
+            const debitCell = row.getCell('J');  // Column J (Debit)
+            const creditCell = row.getCell('K'); // Column K (Credit)
             
             if (record.debit && record.debit !== '-' && !isNaN(parseFloat(String(record.debit).replace(/,/g, '')))) {
                 debitCell.value = parseFloat(String(record.debit).replace(/,/g, ''));
@@ -536,16 +543,18 @@ async function exportLedgerToSheet(workbookManager, extractedData) {
         });
     }
 
-    // Set column widths
-    worksheet.getColumn('D').width = 8;  // Sr.No.
-    worksheet.getColumn('E').width = 25; // Tax Obligation
-    worksheet.getColumn('F').width = 15; // Tax Period
-    worksheet.getColumn('G').width = 15; // Transaction Date
-    worksheet.getColumn('H').width = 20; // Reference Number
-    worksheet.getColumn('I').width = 40; // Particulars
-    worksheet.getColumn('J').width = 18; // Transaction Type
-    worksheet.getColumn('K').width = 15; // Debit
-    worksheet.getColumn('L').width = 15; // Credit
+    // Set column widths to match format
+    worksheet.getColumn('A').width = 3;  // Empty
+    worksheet.getColumn('B').width = 3;  // Empty
+    worksheet.getColumn('C').width = 8;  // Sr.No.
+    worksheet.getColumn('D').width = 25; // Tax Obligation
+    worksheet.getColumn('E').width = 15; // Tax Period
+    worksheet.getColumn('F').width = 18; // Transaction Date
+    worksheet.getColumn('G').width = 22; // Reference Number
+    worksheet.getColumn('H').width = 45; // Particulars
+    worksheet.getColumn('I').width = 20; // Transaction Type
+    worksheet.getColumn('J').width = 18; // Debit(Ksh)
+    worksheet.getColumn('K').width = 18; // Credit(Ksh)
     
     return worksheet;
 }

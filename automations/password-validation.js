@@ -371,7 +371,7 @@ async function runPasswordValidation(company, progressCallback) {
         });
 
         // Save Excel file
-        const fileName = `Password_Validation_${company.pin}_${formattedDateTime}.xlsx`;
+        const fileName = `PASSWORD_VALIDATION_${company.pin}_${formattedDateTime}.xlsx`;
         const filePath = path.join(downloadPath, fileName);
         await workbook.xlsx.writeFile(filePath);
 

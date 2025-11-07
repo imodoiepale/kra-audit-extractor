@@ -452,7 +452,7 @@ async function extractVATData(page, company, dateRange, downloadPath, progressCa
     });
 
     // Save the main VAT file
-    const fileName = `VAT_Returns_${company.pin}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `VAT_RETURNS_${company.pin}_${new Date().toISOString().split('T')[0]}.xlsx`;
     const filePath = path.join(downloadPath, fileName);
     await workbook.xlsx.writeFile(filePath);
     extractedFiles.push(fileName);

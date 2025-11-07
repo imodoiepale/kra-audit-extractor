@@ -3,8 +3,8 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import ExcelJS from "exceljs";
-import retry from 'async-retry';
-import { createClient } from "@supabase/supabase-js";
+// import retry from 'async-retry';
+// import { createClient } from "@supabase/supabase-js";
 import { createWorker } from 'tesseract.js';
 
 const keyFilePath = path.join("./KRA/keys.json");
@@ -18,7 +18,7 @@ fs.mkdir(downloadFolderPath, { recursive: true }).catch(console.error);
 const supabaseUrl = "https://zyszsqgdlrpnunkegipk.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing";
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const readSupabaseData = async () => {
   try {
@@ -37,11 +37,11 @@ const readSupabaseData = async () => {
 async function loginToKRA(page, company) {
   await page.goto("https://itax.kra.go.ke/KRA-Portal/");
   await page.locator("#logid").click();
-  await page.locator("#logid").fill(company.kra_pin);
+  await page.locator('#logid').fill('P052265202R');
   await page.evaluate(() => {
     CheckPIN();
   });
-  await page.locator('input[name="xxZTT9p2wQ"]').fill(company.kra_password);
+  await page.locator('input[name="xxZTT9p2wQ"]').fill('bclitax2025');
   await page.waitForTimeout(500);
 
   const image = await page.waitForSelector("#captcha_img");
@@ -106,51 +106,51 @@ async function loginToKRA(page, company) {
   }
 }
 
-async function uploadToSupabase(filePath, companyName, fileType, extractionDate) {
-  const fileName = `${extractionDate}_${path.basename(filePath)}`;
-  const fileContent = await fs.readFile(filePath);
-  const { data, error } = await supabase.storage
-    .from('kra-documents')
-    .upload(`${companyName}/${fileType}/${fileName}`, fileContent, {
-      contentType: fileType === 'pdf' ? 'application/pdf' : 'image/png'
-    });
+// async function uploadToSupabase(filePath, companyName, fileType, extractionDate) {
+//   const fileName = `${extractionDate}_${path.basename(filePath)}`;
+//   const fileContent = await fs.readFile(filePath);
+//   const { data, error } = await supabase.storage
+//     .from('kra-documents')
+//     .upload(`${companyName}/${fileType}/${fileName}`, fileContent, {
+//       contentType: fileType === 'pdf' ? 'application/pdf' : 'image/png'
+//     });
 
-  if (error) throw error;
-  return data.path;
-}
+//   if (error) throw error;
+//   return data.path;
+// }
 
-async function updateSupabaseTable(companyData, extractionDate, fullTableData) {
-  const { data: existingData, error: fetchError } = await supabase
-    .from('TaxComplianceCertificates')
-    .select('*')
-    .eq('company_pin', companyData.PIN)
-    .single();
+// async function updateSupabaseTable(companyData, extractionDate, fullTableData) {
+//   const { data: existingData, error: fetchError } = await supabase
+//     .from('TaxComplianceCertificates')
+//     .select('*')
+//     .eq('company_pin', companyData.PIN)
+//     .single();
 
-  if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+//   if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
 
-  let updatedData = existingData ? { ...existingData } : { company_pin: companyData.PIN, extractions: {} };
+//   let updatedData = existingData ? { ...existingData } : { company_pin: companyData.PIN, extractions: {} };
   
-  updatedData.company_name = companyData.TaxPayerName;
-  updatedData.extractions[extractionDate] = {
-    status: companyData.Status,
-    certificate_date: companyData.CertificateDate,
-    expiry_date: companyData.ExpiryDate,
-    serial_no: companyData.SerialNo,
-    pdf_link: companyData.pdfLink || "no doc",
-    screenshot_link: companyData.screenshotLink || "no doc",
-    full_table_data: fullTableData
-  };
+//   updatedData.company_name = companyData.TaxPayerName;
+//   updatedData.extractions[extractionDate] = {
+//     status: companyData.Status,
+//     certificate_date: companyData.CertificateDate,
+//     expiry_date: companyData.ExpiryDate,
+//     serial_no: companyData.SerialNo,
+//     pdf_link: companyData.pdfLink || "no doc",
+//     screenshot_link: companyData.screenshotLink || "no doc",
+//     full_table_data: fullTableData
+//   };
 
-  const { data, error } = await supabase
-    .from('TaxComplianceCertificates')
-    .upsert(updatedData, {
-      onConflict: 'company_pin',
-      returning: 'minimal'
-    });
+//   const { data, error } = await supabase
+//     .from('TaxComplianceCertificates')
+//     .upsert(updatedData, {
+//       onConflict: 'company_pin',
+//       returning: 'minimal'
+//     });
 
-  if (error) throw error;
-  return data;
-}
+//   if (error) throw error;
+//   return data;
+// }
 
 async function processCompany(company, downloadFolderPath, formattedDateTime) {
   const browser = await chromium.launch({ headless: false,channel: "chrome" });
@@ -212,15 +212,15 @@ async function processCompany(company, downloadFolderPath, formattedDateTime) {
     console.log("Screenshot taken successfully.");
 
     // Upload screenshot to Supabase Storage
-    const screenshotSupabasePath = await uploadToSupabase(screenshotPath, company.company_name, 'screenshot', formattedDateTime);
+    // const screenshotSupabasePath = await uploadToSupabase(screenshotPath, company.company_name, 'screenshot', formattedDateTime);
 
     // Prepare data for Supabase table
-    const latestExtraction = fullTableData[0];  // Use the first row as the latest extraction
-    latestExtraction.pdfLink = pdfSupabasePath;
-    latestExtraction.screenshotLink = screenshotSupabasePath;
+    // const latestExtraction = fullTableData[0];  // Use the first row as the latest extraction
+    // latestExtraction.pdfLink = pdfSupabasePath;
+    // latestExtraction.screenshotLink = screenshotSupabasePath;
 
     // Update Supabase table with full table data
-    await updateSupabaseTable(latestExtraction, formattedDateTime, fullTableData);
+    // await updateSupabaseTable(latestExtraction, formattedDateTime, fullTableData);
 
     await page.evaluate(() => {
       logOutUser();

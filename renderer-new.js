@@ -123,6 +123,11 @@ function init() {
     setupEventListeners();
     setDefaultDownloadPath();
     // loadSavedConfig(); // Prevents loading old data on startup
+    
+    // Initialize date input toggles
+    toggleVATDateInputs();
+    toggleWhVATDateInputs();
+    
     updateUIState();
 }
 
@@ -1024,84 +1029,105 @@ function displayManufacturerDetails(data) {
 function displayObligationResults(data) {
     if (!elements.obligationResults) return;
 
-    // Display company name prominently at the top
-    let tableHtml = `
-        <div class="company-header">
-            <h3>🏢 ${data.company_name || 'Company Information'}</h3>
-            <div class="company-details">
-                <span class="company-pin">PIN: ${data.kra_pin || 'N/A'}</span>
-                <span class="extraction-date">Checked: ${new Date().toLocaleDateString()}</span>
-            </div>
-        </div>
-    `;
-
-    // Use the enhanced obligation data structure
     const allObligations = data.obligations || [];
+    const activeCount = allObligations.filter(o => o.status && (o.status.toLowerCase().includes('active') || o.status.toLowerCase().includes('registered'))).length;
 
-    tableHtml += `
-        <h4>Taxpayer Status</h4>
-        <div class="summary-section">
-            <div class="summary-card">
-                <span class="summary-label">PIN Status</span>
-                <span class="summary-value ${data.pin_status === 'Active' ? 'success-status' : 'warning-status'}">${data.pin_status || 'Unknown'}</span>
+    let contentHtml = `
+        <div class="extraction-results">
+            <!-- Header -->
+            <div class="results-header">
+                <div class="header-content">
+                    <h3>📋 Obligation Checker</h3>
+                    <div class="header-meta">
+                        <span class="company-name">${data.company_name || appState.companyData?.name || 'Company'}</span>
+                        <span class="pin-badge">PIN: ${data.kra_pin || appState.companyData?.pin || 'N/A'}</span>
+                        <span class="extraction-date">Checked: ${new Date().toLocaleDateString()}</span>
+                    </div>
+                </div>
             </div>
-            <div class="summary-card">
-                <span class="summary-label">iTax Status</span>
-                <span class="summary-value ${data.itax_status === 'Registered' ? 'success-status' : 'warning-status'}">${data.itax_status || 'Unknown'}</span>
-            </div>
-            <div class="summary-card">
-                <span class="summary-label">eTIMS Registration</span>
-                <span class="summary-value ${data.etims_registration === 'Active' ? 'success-status' : 'warning-status'}">${data.etims_registration || 'Unknown'}</span>
-            </div>
-            <div class="summary-card">
-                <span class="summary-label">TIMS Registration</span>
-                <span class="summary-value ${data.tims_registration === 'Active' ? 'success-status' : 'warning-status'}">${data.tims_registration || 'Unknown'}</span>
-            </div>
-        </div>
 
-        <div class="summary-section" style="margin-top: 10px;">
-            <div class="summary-card">
-                <span class="summary-label">VAT Compliance</span>
-                <span class="summary-value ${data.vat_compliance === 'Compliant' ? 'success-status' : 'error-status'}">${data.vat_compliance || 'Unknown'}</span>
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="card-icon">📌</div>
+                    <div class="card-content">
+                        <div class="card-label">PIN Status</div>
+                        <div class="card-value ${data.pin_status === 'Active' ? 'status-active' : 'status-inactive'}">${data.pin_status || 'Unknown'}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">🔐</div>
+                    <div class="card-content">
+                        <div class="card-label">iTax Status</div>
+                        <div class="card-value ${data.itax_status === 'Registered' ? 'status-active' : 'status-inactive'}">${data.itax_status || 'Unknown'}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">🖥️</div>
+                    <div class="card-content">
+                        <div class="card-label">eTIMS Registration</div>
+                        <div class="card-value ${data.etims_registration === 'Active' ? 'status-active' : 'status-inactive'}">${data.etims_registration || 'Unknown'}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">📊</div>
+                    <div class="card-content">
+                        <div class="card-label">TIMS Registration</div>
+                        <div class="card-value ${data.tims_registration === 'Inactive' ? 'status-inactive' : 'status-active'}">${data.tims_registration || 'Unknown'}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">✅</div>
+                    <div class="card-content">
+                        <div class="card-label">VAT Compliance</div>
+                        <div class="card-value ${data.vat_compliance === 'Compliant' ? 'status-active' : 'status-error'}">${data.vat_compliance || 'Unknown'}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">📝</div>
+                    <div class="card-content">
+                        <div class="card-label">Total Obligations</div>
+                        <div class="card-value">${allObligations.length}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">🟢</div>
+                    <div class="card-content">
+                        <div class="card-label">Active Obligations</div>
+                        <div class="card-value">${activeCount}</div>
+                    </div>
+                </div>
             </div>
-            <div class="summary-card">
-                <span class="summary-label">Total Obligations</span>
-                <span class="summary-value">${allObligations.length}</span>
-            </div>
-            <div class="summary-card">
-                <span class="summary-label">Active Obligations</span>
-                <span class="summary-value success-status">${allObligations.filter(o => o.status && (o.status.toLowerCase().includes('active') || o.status.toLowerCase().includes('registered'))).length}</span>
-            </div>
-            <div class="summary-card">
-                <span class="summary-label">Status</span>
-                <span class="summary-value success-status">✓ Completed</span>
-            </div>
-        </div>
     `;
 
+    // Tax Obligations Table
     if (allObligations.length > 0) {
-        tableHtml += `
-            <h4 style="margin-top: 20px;">Tax Obligations</h4>
-            <!-- Main Obligations Table -->
-            <table class="results-table">
-                <thead>
-                    <tr>
-                        <th>Obligation Name</th>
-                        <th>Status</th>
-                        <th>Effective From</th>
-                        <th>Effective To</th>
-                    </tr>
-                </thead>
-                <tbody>
+        contentHtml += `
+            <div class="data-section">
+                <div class="section-header">
+                    <h4>📋 Tax Obligations</h4>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Obligation Name</th>
+                            <th>Status</th>
+                            <th>Effective From</th>
+                            <th>Effective To</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
 
-        allObligations.forEach(obligation => {
-            const statusClass = obligation.status && (obligation.status.toLowerCase().includes('active') || obligation.status.toLowerCase().includes('registered')) ? 'success-status' : 
-                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'error-status' : 
-                               'warning-status';
+        allObligations.forEach((obligation, index) => {
+            const statusClass = obligation.status && (obligation.status.toLowerCase().includes('active') || obligation.status.toLowerCase().includes('registered')) ? 'status-badge status-approved' : 
+                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'status-badge status-expired' : 
+                               'status-badge';
             
-            tableHtml += `
+            contentHtml += `
                 <tr>
+                    <td>${index + 1}</td>
                     <td>${obligation.name || 'N/A'}</td>
                     <td><span class="${statusClass}">${obligation.status || 'N/A'}</span></td>
                     <td>${obligation.effectiveFrom || 'N/A'}</td>
@@ -1110,19 +1136,22 @@ function displayObligationResults(data) {
             `;
         });
 
-        tableHtml += `
-                </tbody>
-            </table>
+        contentHtml += `
+                    </tbody>
+                </table>
+            </div>
         `;
     } else {
-        tableHtml += `
+        contentHtml += `
             <div class="no-data-message">
                 <p>📋 No tax obligations found for this company.</p>
             </div>
         `;
     }
 
-    elements.obligationResults.innerHTML = tableHtml;
+    contentHtml += `</div>`;
+
+    elements.obligationResults.innerHTML = contentHtml;
     elements.obligationResults.classList.remove('hidden');
 }
 
@@ -1130,40 +1159,80 @@ function displayObligationResults(data) {
 function displayAgentCheckResults(data) {
     if (!elements.agentCheckResults) return;
 
-    // Display company name prominently at the top
-    let resultHtml = `
-        <div class="company-header">
-            <h3>🏢 ${data.companyName || 'Company Information'}</h3>
-            <div class="company-details">
-                <span class="company-pin">PIN: ${data.pin || 'N/A'}</span>
-                <span class="extraction-date">Checked: ${new Date(data.timestamp).toLocaleString()}</span>
-            </div>
-        </div>
-    `;
+    const vatStatus = data.vat?.isRegistered === true ? 'Registered' : 
+                     data.vat?.isRegistered === false ? 'Not Registered' : 'Unknown';
+    const rentStatus = data.rent?.isRegistered === true ? 'Registered' : 
+                      data.rent?.isRegistered === false ? 'Not Registered' : 'Unknown';
 
-    // Build table with agent status
-    resultHtml += `
-        <h4 style="margin-top: 20px;">Withholding Agent Status</h4>
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Agent Type</th>
-                    <th>Status</th>
-                    <th>CAPTCHA Retries</th>
-                    <th>Message</th>
-                </tr>
-            </thead>
-            <tbody>
+    let contentHtml = `
+        <div class="extraction-results">
+            <!-- Header -->
+            <div class="results-header">
+                <div class="header-content">
+                    <h3>🔍 Withholding Agent Checker</h3>
+                    <div class="header-meta">
+                        <span class="company-name">${data.companyName || appState.companyData?.name || 'Company'}</span>
+                        <span class="pin-badge">PIN: ${data.pin || appState.companyData?.pin || 'N/A'}</span>
+                        <span class="extraction-date">Checked: ${new Date(data.timestamp).toLocaleDateString()}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="card-icon">📊</div>
+                    <div class="card-content">
+                        <div class="card-label">VAT Withholding Agent</div>
+                        <div class="card-value ${data.vat?.isRegistered === true ? 'status-active' : 'status-inactive'}">${vatStatus}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">🏠</div>
+                    <div class="card-content">
+                        <div class="card-label">Rent Income Agent</div>
+                        <div class="card-value ${data.rent?.isRegistered === true ? 'status-active' : 'status-inactive'}">${rentStatus}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">🔄</div>
+                    <div class="card-content">
+                        <div class="card-label">VAT CAPTCHA Retries</div>
+                        <div class="card-value">${data.vat?.captchaRetries || 0}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">🔄</div>
+                    <div class="card-content">
+                        <div class="card-label">Rent CAPTCHA Retries</div>
+                        <div class="card-value">${data.rent?.captchaRetries || 0}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agent Status Table -->
+            <div class="data-section">
+                <div class="section-header">
+                    <h4>🔍 Withholding Agent Status</h4>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Agent Type</th>
+                            <th>Status</th>
+                            <th>CAPTCHA Retries</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
     `;
 
     // VAT Withholding Agent Row
     if (data.vat) {
-        const vatStatus = data.vat.isRegistered === true ? 'Registered' : 
-                         data.vat.isRegistered === false ? 'Not Registered' : 'Unknown';
-        const vatStatusClass = data.vat.isRegistered === true ? 'success-status' : 
-                              data.vat.isRegistered === false ? 'error-status' : 'warning-status';
+        const vatStatusClass = data.vat.isRegistered === true ? 'status-badge status-approved' : 
+                              data.vat.isRegistered === false ? 'status-badge status-expired' : 'status-badge';
         
-        resultHtml += `
+        contentHtml += `
             <tr>
                 <td><strong>VAT Withholding Agent</strong></td>
                 <td><span class="${vatStatusClass}">${vatStatus}</span></td>
@@ -1175,12 +1244,10 @@ function displayAgentCheckResults(data) {
 
     // Rent Income Withholding Agent Row
     if (data.rent) {
-        const rentStatus = data.rent.isRegistered === true ? 'Registered' : 
-                          data.rent.isRegistered === false ? 'Not Registered' : 'Unknown';
-        const rentStatusClass = data.rent.isRegistered === true ? 'success-status' : 
-                               data.rent.isRegistered === false ? 'error-status' : 'warning-status';
+        const rentStatusClass = data.rent.isRegistered === true ? 'status-badge status-approved' : 
+                               data.rent.isRegistered === false ? 'status-badge status-expired' : 'status-badge';
         
-        resultHtml += `
+        contentHtml += `
             <tr>
                 <td><strong>Rent Income Withholding Agent</strong></td>
                 <td><span class="${rentStatusClass}">${rentStatus}</span></td>
@@ -1190,9 +1257,10 @@ function displayAgentCheckResults(data) {
         `;
     }
 
-    resultHtml += `
-            </tbody>
-        </table>
+    contentHtml += `
+                    </tbody>
+                </table>
+            </div>
     `;
 
     // Additional details if available
@@ -1200,43 +1268,38 @@ function displayAgentCheckResults(data) {
     const hasRentDetails = data.rent?.details && Object.keys(data.rent.details).length > 0;
 
     if (hasVatDetails || hasRentDetails) {
-        resultHtml += `<h4 style="margin-top: 20px;">Additional Details</h4>`;
+        contentHtml += `<div class="data-section"><div class="section-header"><h4>ℹ️ Additional Details</h4></div>`;
         
         if (hasVatDetails) {
-            resultHtml += `
-                <div class="details-section">
+            contentHtml += `
+                <div class="details-subsection">
                     <h5>VAT Agent Details:</h5>
                     <ul>
             `;
             for (const [key, value] of Object.entries(data.vat.details)) {
-                resultHtml += `<li><strong>${key}:</strong> ${value}</li>`;
+                contentHtml += `<li><strong>${key}:</strong> ${value}</li>`;
             }
-            resultHtml += `</ul></div>`;
+            contentHtml += `</ul></div>`;
         }
 
         if (hasRentDetails) {
-            resultHtml += `
-                <div class="details-section">
+            contentHtml += `
+                <div class="details-subsection">
                     <h5>Rent Income Agent Details:</h5>
                     <ul>
             `;
             for (const [key, value] of Object.entries(data.rent.details)) {
-                resultHtml += `<li><strong>${key}:</strong> ${value}</li>`;
+                contentHtml += `<li><strong>${key}:</strong> ${value}</li>`;
             }
-            resultHtml += `</ul></div>`;
+            contentHtml += `</ul></div>`;
         }
+        
+        contentHtml += `</div>`;
     }
 
-    // Overall error if any
-    if (data.error) {
-        resultHtml += `
-            <div class="error-section">
-                <p class="error-message">⚠️ Error: ${data.error}</p>
-            </div>
-        `;
-    }
+    contentHtml += `</div>`;
 
-    elements.agentCheckResults.innerHTML = resultHtml;
+    elements.agentCheckResults.innerHTML = contentHtml;
     elements.agentCheckResults.classList.remove('hidden');
 }
 
@@ -1879,16 +1942,36 @@ function toggleWhVATDateInputs() {
 function getWhVATDateRange() {
     const selectedRange = document.querySelector('input[name="whVatDateRange"]:checked')?.value;
     
+    console.log('WH VAT Date Range Selection:', selectedRange);
+    
     if (selectedRange === 'all') {
+        console.log('WH VAT: Extracting all available data');
         return 'all';
     }
     
     // Custom range
+    const startMonth = parseInt(elements.whVatStartMonth?.value || 1);
+    const startYear = parseInt(elements.whVatStartYear?.value || new Date().getFullYear());
+    const endMonth = parseInt(elements.whVatEndMonth?.value || 12);
+    const endYear = parseInt(elements.whVatEndYear?.value || new Date().getFullYear());
+    
+    console.log(`WH VAT Custom Range: ${startMonth}/${startYear} to ${endMonth}/${endYear}`);
+    
+    // Validate date range
+    if (startYear > endYear || (startYear === endYear && startMonth > endMonth)) {
+        console.warn('Invalid date range: Start date is after end date');
+        showToast({
+            type: 'warning',
+            title: 'Invalid Date Range',
+            message: 'Start date must be before or equal to end date'
+        });
+    }
+    
     return {
-        startMonth: parseInt(elements.whVatStartMonth.value),
-        startYear: parseInt(elements.whVatStartYear.value),
-        endMonth: parseInt(elements.whVatEndMonth.value),
-        endYear: parseInt(elements.whVatEndYear.value)
+        startMonth: startMonth,
+        startYear: startYear,
+        endMonth: endMonth,
+        endYear: endYear
     };
 }
 
@@ -2095,15 +2178,156 @@ async function runTCCDownloader() {
 function displayTCCResults(data) {
     if (!elements.tccResults) return;
 
-    let contentHtml = `<h4>Download Complete</h4>`;
+    const validCount = data.tableData ? data.tableData.filter(row => row.status.toLowerCase() === 'approved').length : 0;
+    const expiredCount = data.tableData ? data.tableData.filter(row => row.status.toLowerCase() === 'expired').length : 0;
+
+    let contentHtml = `
+        <div class="extraction-results">
+            <!-- Header -->
+            <div class="results-header">
+                <div class="header-content">
+                    <h3>✅ Tax Compliance Certificate</h3>
+                    <div class="header-meta">
+                        <span class="company-name">${appState.companyData?.name || 'Company'}</span>
+                        <span class="pin-badge">PIN: ${appState.companyData?.pin || 'N/A'}</span>
+                        <span class="extraction-date">Downloaded: ${new Date().toLocaleDateString()}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="card-icon">📄</div>
+                    <div class="card-content">
+                        <div class="card-label">Total Certificates</div>
+                        <div class="card-value">${data.tableData?.length || 0}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">✅</div>
+                    <div class="card-content">
+                        <div class="card-label">Valid</div>
+                        <div class="card-value status-active">${validCount}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">⏰</div>
+                    <div class="card-content">
+                        <div class="card-label">Expired</div>
+                        <div class="card-value status-error">${expiredCount}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">💾</div>
+                    <div class="card-content">
+                        <div class="card-label">Status</div>
+                        <div class="card-value status-active">Downloaded</div>
+                    </div>
+                </div>
+            </div>
+    `;
+    
+    // File info section
     if (data.files && data.files.length > 0) {
-        contentHtml += `<p>File saved to: <a href="#" onclick="openFile('${data.files[0]}')">${data.files[0]}</a></p>`;
-    } else {
-        contentHtml += `<p>Could not retrieve file path.</p>`;
+        contentHtml += `
+            <div class="data-section">
+                <div class="section-header">
+                    <h4>📁 Downloaded File</h4>
+                </div>
+                <div class="file-info-box">
+                    <p><strong>File Location:</strong> <a href="#" onclick="openFile('${data.files[0]}')">${data.files[0]}</a></p>
+                    <button class="btn btn-primary" onclick="viewTCCPDF('${data.files[0]}')">
+                        <span>👁️</span> View PDF
+                    </button>
+                </div>
+            </div>`;
     }
+
+    // Display TCC History Table
+    if (data.tableData && data.tableData.length > 0) {
+        contentHtml += `
+            <div class="data-section">
+                <div class="section-header">
+                    <h4>📋 Certificate History (${data.tableData.length} certificates)</h4>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Sr.No.</th>
+                            <th>PIN</th>
+                            <th>TaxPayer/Company Name</th>
+                            <th>Status</th>
+                            <th>Certificate Date</th>
+                            <th>Expiry Date</th>
+                            <th>Serial No</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+        data.tableData.forEach(row => {
+            const isApproved = row.status.toLowerCase() === 'approved';
+            const isExpired = row.status.toLowerCase() === 'expired';
+            const statusClass = isApproved ? 'status-badge status-approved' : 
+                              isExpired ? 'status-badge status-expired' : 'status-badge';
+            const statusText = isApproved ? 'Valid' : row.status;
+            
+            contentHtml += `
+                        <tr>
+                            <td>${row.srNo}</td>
+                            <td>${row.pin}</td>
+                            <td>${row.companyName}</td>
+                            <td><span class="${statusClass}">${statusText}</span></td>
+                            <td>${row.certificateDate}</td>
+                            <td>${row.expiryDate}</td>
+                            <td>${row.serialNo}</td>
+                        </tr>`;
+        });
+        
+        contentHtml += `
+                    </tbody>
+                </table>
+            </div>`;
+    }
+
+    contentHtml += `</div>`;
+
+    // Add PDF viewer modal (outside the extraction-results div)
+    contentHtml += `
+        <div id="tccPdfViewer" class="pdf-modal-overlay hidden" onclick="closeTCCPDFViewer()">
+            <div class="pdf-modal-content" onclick="event.stopPropagation()">
+                <div class="pdf-modal-header">
+                    <h5>📄 Tax Compliance Certificate</h5>
+                    <button class="btn btn-secondary" onclick="closeTCCPDFViewer()">✕ Close</button>
+                </div>
+                <iframe id="tccPdfFrame" class="pdf-iframe" frameborder="0"></iframe>
+            </div>
+        </div>`;
 
     elements.tccResults.innerHTML = contentHtml;
     elements.tccResults.classList.remove('hidden');
+}
+
+function viewTCCPDF(filePath) {
+    const pdfViewer = document.getElementById('tccPdfViewer');
+    const pdfFrame = document.getElementById('tccPdfFrame');
+    
+    if (pdfViewer && pdfFrame) {
+        // Convert file path to file:// URL
+        const fileUrl = `file:///${filePath.replace(/\\/g, '/')}`;
+        pdfFrame.src = fileUrl;
+        pdfViewer.classList.remove('hidden');
+    }
+}
+
+function closeTCCPDFViewer() {
+    const pdfViewer = document.getElementById('tccPdfViewer');
+    const pdfFrame = document.getElementById('tccPdfFrame');
+    
+    if (pdfViewer && pdfFrame) {
+        pdfFrame.src = '';
+        pdfViewer.classList.add('hidden');
+    }
 }
 
 function openFile(filePath) {
@@ -2832,60 +3056,76 @@ function displayLiabilitiesResults(result) {
     const hasSeparateMethods = method1Data && method2Data;
 
     let tableHtml = `
-        <div class="company-header">
-            <h3>🏢 ${appState.companyData?.name || 'Company'} - Liabilities Extraction</h3>
-            <div class="company-details">
-                <span class="company-pin">PIN: ${appState.companyData?.pin || 'N/A'}</span>
-                <span class="extraction-date">Extracted: ${new Date().toLocaleDateString()}</span>
+        <div class="extraction-results">
+            <!-- Header -->
+            <div class="results-header">
+                <div class="header-content">
+                    <h3>💰 Tax Liabilities</h3>
+                    <div class="header-meta">
+                        <span class="company-name">${appState.companyData?.name || 'Company'}</span>
+                        <span class="pin-badge">PIN: ${appState.companyData?.pin || 'N/A'}</span>
+                        <span class="extraction-date">Extracted: ${new Date().toLocaleDateString()}</span>
+                    </div>
+                </div>
             </div>
-        </div>
-        
-        <!-- Overall Summary Section -->
-        <div class="summary-section">
-            <div class="summary-card">
-                <span class="summary-label">Total Outstanding</span>
-                <span class="summary-value total-amount">KES ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div class="summary-card">
-                <span class="summary-label">Total Records</span>
-                <span class="summary-value">${recordCount}</span>
-            </div>
+
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="card-icon">💵</div>
+                    <div class="card-content">
+                        <div class="card-label">Total Outstanding</div>
+                        <div class="card-value status-error">KES ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">📊</div>
+                    <div class="card-content">
+                        <div class="card-label">Total Records</div>
+                        <div class="card-value">${recordCount}</div>
+                    </div>
+                </div>
     `;
     
     if (hasSeparateMethods) {
         tableHtml += `
-            <div class="summary-card">
-                <span class="summary-label">Method 1 Records</span>
-                <span class="summary-value">${method1Data.recordCount || 0}</span>
-            </div>
-            <div class="summary-card">
-                <span class="summary-label">Method 2 Records</span>
-                <span class="summary-value">${method2Data.recordCount || 0}</span>
-            </div>
+                <div class="summary-card">
+                    <div class="card-icon">📋</div>
+                    <div class="card-content">
+                        <div class="card-label">Method 1 Records</div>
+                        <div class="card-value">${method1Data.recordCount || 0}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">💳</div>
+                    <div class="card-content">
+                        <div class="card-label">Method 2 Records</div>
+                        <div class="card-value">${method2Data.recordCount || 0}</div>
+                    </div>
+                </div>
         `;
     }
     
     tableHtml += `
-            <div class="summary-card">
-                <span class="summary-label">Status</span>
-                <span class="summary-value success-status">✓ Completed</span>
+                <div class="summary-card">
+                    <div class="card-icon">✅</div>
+                    <div class="card-content">
+                        <div class="card-label">Status</div>
+                        <div class="card-value status-active">Completed</div>
+                    </div>
+                </div>
             </div>
-        </div>
     `;
 
     if (hasSeparateMethods) {
         // Display Method 1 Section
         if (method1Data && method1Data.data.length > 0) {
             tableHtml += `
-                <div class="method-section">
-                    <div class="method-header method1-header">
-                        <h4>📋 METHOD 1: VAT Refund Approach</h4>
-                        <div class="method-stats">
-                            <span>Records: ${method1Data.recordCount}</span>
-                            <span>Amount: KES ${method1Data.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
+                <div class="data-section">
+                    <div class="section-header">
+                        <h4>📋 METHOD 1: VAT Refund Approach (${method1Data.recordCount} records - KES ${method1Data.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</h4>
                     </div>
-                    <table class="results-table method1-table">
+                    <table class="data-table">
                         <thead>
                             <tr>
                                 <th>Tax Type</th>
@@ -2925,8 +3165,8 @@ function displayLiabilitiesResults(result) {
             `;
         } else {
             tableHtml += `
-                <div class="method-section">
-                    <div class="method-header method1-header">
+                <div class="data-section">
+                    <div class="section-header">
                         <h4>📋 METHOD 1: VAT Refund Approach</h4>
                     </div>
                     <div class="no-data-message">
@@ -2971,15 +3211,11 @@ function displayLiabilitiesResults(result) {
             const displayTotal = mainTotal > 0 ? mainTotal : method2Data.totalAmount;
             
             tableHtml += `
-                <div class="method-section">
-                    <div class="method-header method2-header">
-                        <h4>💳 METHOD 2: Payment Registration Approach</h4>
-                        <div class="method-stats">
-                            <span>Records: ${method2Data.recordCount}</span>
-                            <span>Amount: KES ${displayTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
+                <div class="data-section">
+                    <div class="section-header">
+                        <h4>💳 METHOD 2: Payment Registration Approach (${method2Data.recordCount} records - KES ${displayTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</h4>
                     </div>
-                    <table class="results-table method2-table">
+                    <table class="data-table">
                         <thead>
                             <tr>
                                 <th>Tax Type</th>
@@ -3061,8 +3297,8 @@ function displayLiabilitiesResults(result) {
             `;
         } else {
             tableHtml += `
-                <div class="method-section">
-                    <div class="method-header method2-header">
+                <div class="data-section">
+                    <div class="section-header">
                         <h4>💳 METHOD 2: Payment Registration Approach</h4>
                     </div>
                     <div class="no-data-message">
@@ -3077,17 +3313,21 @@ function displayLiabilitiesResults(result) {
         // Fallback to single method display
         if (recordCount > 0) {
             tableHtml += `
-                <table class="results-table">
-                    <thead>
-                        <tr>
-                            <th>Tax Type</th>
-                            <th>Period</th>
-                            <th>Due Date</th>
-                            <th>Amount (KES)</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                <div class="data-section">
+                    <div class="section-header">
+                        <h4>💰 Outstanding Liabilities</h4>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tax Type</th>
+                                <th>Period</th>
+                                <th>Due Date</th>
+                                <th>Amount (KES)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
             `;
 
             liabilitiesData.forEach(liability => {
@@ -3097,31 +3337,29 @@ function displayLiabilitiesResults(result) {
                         <td>${liability.taxType || 'N/A'}</td>
                         <td>${liability.period || 'N/A'}</td>
                         <td>${liability.dueDate || 'N/A'}</td>
-                        <td class="amount-cell">${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td><span class="warning-status">Outstanding</span></td>
+                        <td>${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td><span class="status-badge status-expired">Outstanding</span></td>
                     </tr>
                 `;
             });
 
             tableHtml += `
-                    </tbody>
-                    <tfoot>
-                        <tr class="total-row">
-                            <td colspan="3"><strong>TOTAL OUTSTANDING</strong></td>
-                            <td class="amount-cell total-amount"><strong>KES ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
-                            <td></td>
-                        </tr>
-                    </tfoot>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
             `;
         } else {
             tableHtml += `
-                <div class="no-data-message">
-                    <p>✅ No outstanding liabilities found. Your account is up to date!</p>
+                <div class="data-section">
+                    <div class="no-data-message">
+                        <p>✅ No outstanding liabilities found. Your account is up to date!</p>
+                    </div>
                 </div>
             `;
         }
     }
+    
+    tableHtml += `</div>`; // Close extraction-results
 
     tableHtml += `
         <div class="extraction-info">
@@ -3141,63 +3379,90 @@ function displayLedgerResults(result) {
     const recordCount = ledgerData.length || 0;
 
     let tableHtml = `
-        <h4>General Ledger Transactions</h4>
-        
-        <!-- Summary Section -->
-        <div class="summary-section">
-            <div class="summary-card">
-                <span class="summary-label">Records Found</span>
-                <span class="summary-value">${recordCount}</span>
+        <div class="extraction-results">
+            <!-- Header -->
+            <div class="results-header">
+                <div class="header-content">
+                    <h3>📒 General Ledger</h3>
+                    <div class="header-meta">
+                        <span class="company-name">${appState.companyData?.name || 'Company'}</span>
+                        <span class="pin-badge">PIN: ${appState.companyData?.pin || 'N/A'}</span>
+                        <span class="extraction-date">Extracted: ${new Date().toLocaleDateString()}</span>
+                    </div>
+                </div>
             </div>
-            <div class="summary-card">
-                <span class="summary-label">Status</span>
-                <span class="summary-value success-status">✓ Completed</span>
+
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="card-icon">📊</div>
+                    <div class="card-content">
+                        <div class="card-label">Total Transactions</div>
+                        <div class="card-value">${recordCount}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">✅</div>
+                    <div class="card-content">
+                        <div class="card-label">Status</div>
+                        <div class="card-value status-active">Completed</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">💾</div>
+                    <div class="card-content">
+                        <div class="card-label">Export</div>
+                        <div class="card-value">Excel Saved</div>
+                    </div>
+                </div>
             </div>
-            <div class="summary-card">
-                <span class="summary-label">File Location</span>
-                <span class="summary-value">📁 Excel Saved</span>
-            </div>
-        </div>
     `;
 
     if (recordCount > 0) {
+        // Get headers from first transaction (dynamically)
+        const firstTransaction = ledgerData[0];
+        const headers = firstTransaction.headers || [
+            'Sr.No', 'Tax Obligation', 'Tax Period', 'Transaction Date',
+            'Reference Number', 'Particulars', 'Transaction Type', 'Debit(Ksh)', 'Credit(Ksh)'
+        ];
+        
         tableHtml += `
-            <!-- Detailed Ledger Table -->
-            <div class="table-container">
-                <table class="results-table">
+            <div class="data-section">
+                <div class="section-header">
+                    <h4>📋 Transaction Details (${recordCount} records)</h4>
+                </div>
+                <table class="data-table ledger-table">
                     <thead>
                         <tr>
-                            <th>Sr.No</th>
-                            <th>Tax Obligation</th>
-                            <th>Period</th>
-                            <th>Date</th>
-                            <th>Ref No.</th>
-                            <th>Particulars</th>
-                            <th>Type</th>
-                            <th>Debit</th>
-                            <th>Credit</th>
+                            <th></th>
+        `;
+        
+        // Add dynamic headers
+        headers.forEach(header => {
+            tableHtml += `<th>${header.toUpperCase()}</th>`;
+        });
+        
+        tableHtml += `
                         </tr>
                     </thead>
                     <tbody>
         `;
 
         ledgerData.forEach(transaction => {
-            const isTotal = transaction.isTotal || (transaction.srNo && transaction.srNo.toLowerCase().includes('total'));
+            const isTotal = transaction.isTotal || false;
             const rowClass = isTotal ? 'total-row' : '';
+            const columns = transaction.columns || [];
             
-            tableHtml += `
-                <tr class="${rowClass}">
-                    <td title="${transaction.srNo || ''}">${transaction.srNo || ''}</td>
-                    <td title="${transaction.taxObligation || ''}">${transaction.taxObligation || ''}</td>
-                    <td title="${transaction.taxPeriod || ''}">${transaction.taxPeriod || ''}</td>
-                    <td title="${transaction.transactionDate || ''}">${transaction.transactionDate || ''}</td>
-                    <td title="${transaction.referenceNumber || ''}">${transaction.referenceNumber || ''}</td>
-                    <td title="${transaction.particulars || ''}">${transaction.particulars || ''}</td>
-                    <td title="${transaction.transactionType || ''}">${transaction.transactionType || ''}</td>
-                    <td class="amount-cell" title="${transaction.debit || ''}">${transaction.debit || ''}</td>
-                    <td class="amount-cell" title="${transaction.credit || ''}">${transaction.credit || ''}</td>
-                </tr>
-            `;
+            tableHtml += `<tr class="${rowClass}"><td></td>`;
+            
+            // Add dynamic columns
+            columns.forEach((value, index) => {
+                const isNumeric = !isNaN(parseFloat(value.replace(/,/g, ''))) && value.match(/[\d,]+\.?\d*/);
+                const cellClass = isNumeric ? 'amount-cell' : '';
+                tableHtml += `<td class="${cellClass}">${value || ''}</td>`;
+            });
+            
+            tableHtml += `</tr>`;
         });
 
         tableHtml += `
@@ -3207,15 +3472,15 @@ function displayLedgerResults(result) {
         `;
     } else {
         tableHtml += `
-            <div class="no-data-message">
-                <p>📊 No ledger transactions found for the selected criteria.</p>
+            <div class="data-section">
+                <div class="no-data-message">
+                    <p>📊 No ledger transactions found for the selected criteria.</p>
+                </div>
             </div>
         `;
     }
 
     tableHtml += `
-        <div class="extraction-info">
-            <small>📁 Excel file saved to: ${result.downloadPath || 'Default location'}</small>
         </div>
     `;
 

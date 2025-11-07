@@ -60,6 +60,19 @@ ipcMain.handle('select-download-folder', async () => {
   return null;
 });
 
+// Alias for settings modal
+ipcMain.handle('select-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Select Output Folder'
+  });
+  
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0];
+  }
+  return null;
+});
+
 ipcMain.handle('save-config', async (event, config) => {
   try {
     const configPath = path.join(__dirname, 'config.json');

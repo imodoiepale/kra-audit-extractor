@@ -23,7 +23,7 @@ async function runTCCDownloader(company, downloadPath, progressCallback) {
             throw new Error('Login failed. Please check credentials and try again.');
         }
 
-        const filePath = await downloadTCC(page, company, downloadPath, progressCallback);
+        const { filePath, tableData } = await downloadTCC(page, company, downloadPath, progressCallback);
 
         await browser.close();
 
@@ -36,7 +36,8 @@ async function runTCCDownloader(company, downloadPath, progressCallback) {
         return {
             success: true,
             message: 'TCC downloaded successfully.',
-            files: [filePath]
+            files: [filePath],
+            tableData: tableData
         };
     } catch (error) {
         console.error('Error during TCC download:', error);
@@ -91,7 +92,7 @@ async function loginToKRA(page, company, downloadFolderPath, progressCallback) {
         } else {
             throw new Error("Unsupported arithmetic operator in CAPTCHA");
         }
-        
+
         progressCallback({
             log: `CAPTCHA solved: ${numbers[0]} ${text.includes("+") ? "+" : "-"} ${numbers[1]} = ${result}`
         });
@@ -113,12 +114,12 @@ async function loginToKRA(page, company, downloadFolderPath, progressCallback) {
 
     await page.type("#captcahText", result.toString());
     await page.click("#loginButton");
-    
+
     await page.waitForTimeout(2000);
 
-    const mainMenu = await page.waitForSelector("#ddtopmenubar > ul > li:nth-child(1) > a", { 
-        timeout: 5000, 
-        state: "visible" 
+    const mainMenu = await page.waitForSelector("#ddtopmenubar > ul > li:nth-child(1) > a", {
+        timeout: 5000,
+        state: "visible"
     }).catch(() => false);
 
     if (mainMenu) {
@@ -126,9 +127,9 @@ async function loginToKRA(page, company, downloadFolderPath, progressCallback) {
         return true;
     }
 
-    const isInvalidLogin = await page.waitForSelector('b:has-text("Wrong result of the arithmetic operation.")', { 
-        state: 'visible', 
-        timeout: 3000 
+    const isInvalidLogin = await page.waitForSelector('b:has-text("Wrong result of the arithmetic operation.")', {
+        state: 'visible',
+        timeout: 3000
     }).catch(() => false);
 
     if (isInvalidLogin) {
@@ -141,62 +142,93 @@ async function loginToKRA(page, company, downloadFolderPath, progressCallback) {
 }
 
 async function downloadTCC(page, company, downloadPath, progressCallback) {
+    await page.goto("https://itax.kra.go.ke/KRA-Portal/");
     progressCallback({ message: 'Navigating to Certificates menu...', progress: 40 });
     await page.hover('#ddtopmenubar > ul > li:nth-child(8) > a');
-    await page.evaluate(() => { showSubMenu(8); });
+    await page.evaluate(() => { showReprintTCC(); });
     await page.waitForTimeout(1000);
 
-    progressCallback({ message: 'Opening Consult and Reprint TCC page...', progress: 50 });
-    await page.locator('a:has-text("Consult and Reprint TCC")').click();
+    progressCallback({ message: 'Clicking Consult button...', progress: 50 });
 
-    // Handle confirmation dialog
-    page.once('dialog', async dialog => {
+    // Click Consult button directly (first time)
+    await page.getByRole('button', { name: 'Consult' }).click();
+    await page.waitForTimeout(1000);
+
+    // Handle dialog and click Consult button again
+    page.once("dialog", async dialog => {
+        console.log(`Dialog: ${dialog.message()}`);
+        progressCallback({ log: `Dialog: ${dialog.message()}` });
         await dialog.accept();
     });
-    await page.locator('#consultRePrintId').click();
 
-    progressCallback({ message: 'Finding the latest TCC...', progress: 60 });
-    await page.waitForSelector('#tccReprintVo_wrapper', { timeout: 10000 });
+    await page.getByRole("button", { name: "Consult" }).click();
 
-    const rows = await page.locator('#tccReprintVo tbody tr').all();
-    if (rows.length === 0) {
-        throw new Error('No Tax Compliance Certificates found for this PIN.');
+    // Wait for table to load
+    progressCallback({ message: 'Extracting TCC history...', progress: 60 });
+    await page.waitForSelector('#tbl', { timeout: 10000 });
+
+    // Extract full table data from #tbl
+    const tableData = await page.evaluate(() => {
+        const table = document.querySelector('#tbl');
+        if (!table) return [];
+
+        const rows = table.querySelectorAll('tbody tr');
+        const data = [];
+
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 7) {
+                const serialNoCell = cells[6];
+                const link = serialNoCell.querySelector('a');
+
+                data.push({
+                    srNo: cells[0].textContent.trim().replace('&nbsp;', ''),
+                    pin: cells[1].textContent.trim().replace('&nbsp;', ''),
+                    companyName: cells[2].textContent.trim().replace('&nbsp;', ''),
+                    status: cells[3].textContent.trim().replace('&nbsp;', ''),
+                    certificateDate: cells[4].textContent.trim().replace('&nbsp;', ''),
+                    expiryDate: cells[5].textContent.trim().replace('&nbsp;', ''),
+                    serialNo: serialNoCell.textContent.trim().replace('&nbsp;', ''),
+                    hasLink: !!link,
+                    onclick: link ? link.getAttribute('onclick') : null
+                });
+            }
+        });
+
+        return data;
+    });
+
+    progressCallback({ message: `Found ${tableData.length} certificate(s) in history`, progress: 65 });
+
+    // Download PDF if available
+    progressCallback({ message: 'Checking for TCC certificate download...', progress: 70 });
+    const downloadLink = await page.$('a.textDecorationUnderline');
+    
+    let filePath = null;
+    
+    if (downloadLink) {
+        progressCallback({ message: 'Downloading TCC certificate...', progress: 75 });
+        
+        const [download] = await Promise.all([
+            page.waitForEvent('download'),
+            downloadLink.click(),
+        ]);
+
+        const now = new Date();
+        const formattedDate = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
+        const fileName = `KRA-TCC-${company.pin}-${formattedDate}.pdf`;
+        filePath = path.join(downloadPath, fileName);
+
+        await download.saveAs(filePath);
+        progressCallback({ message: `TCC downloaded successfully: ${fileName}`, progress: 90 });
+    } else {
+        progressCallback({ message: 'No TCC certificate available for download', progress: 90, logType: 'warning' });
+        // Create a placeholder path
+        filePath = path.join(downloadPath, `KRA-TCC-${company.pin}-NO-CERT.txt`);
+        await fs.writeFile(filePath, 'No TCC certificate available for this PIN.');
     }
 
-    let latestTccRow = null;
-    let latestDate = new Date(0);
-
-    for (const row of rows) {
-        const dateText = await row.locator('td:nth-child(4)').textContent();
-        const [day, month, year] = dateText.split('-').map(Number);
-        const tccDate = new Date(year, month - 1, day);
-
-        if (tccDate > latestDate) {
-            latestDate = tccDate;
-            latestTccRow = row;
-        }
-    }
-
-    if (!latestTccRow) {
-        throw new Error('Could not determine the latest TCC to download.');
-    }
-
-    progressCallback({ message: 'Downloading the latest TCC...', progress: 75 });
-
-    const [download] = await Promise.all([
-        page.waitForEvent('download'),
-        latestTccRow.locator('a:has-text("Reprint")').click(),
-    ]);
-
-    const now = new Date();
-    const formattedDate = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
-    const fileName = `KRA-TCC-${company.pin}-${formattedDate}.pdf`;
-    const filePath = path.join(downloadPath, fileName);
-
-    await download.saveAs(filePath);
-    progressCallback({ message: `TCC downloaded successfully: ${fileName}`, progress: 90 });
-
-    return filePath;
+    return { filePath, tableData };
 }
 
 module.exports = { runTCCDownloader };

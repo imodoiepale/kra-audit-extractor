@@ -25,10 +25,11 @@
         "nodemon": "^3.1.10"
     },
     "dependencies": {
+        "@supabase/supabase-js": "^2.80.0",
         "exceljs": "^4.4.0",
+        "node-fetch": "^2.6.1",
         "playwright": "^1.55.0",
-        "tesseract.js": "^5.1.1",
-    "node-fetch": "^2.6.1"
+        "tesseract.js": "^5.1.1"
     },
     "build": {
         "appId": "com.yourcompany.kra-extractor",

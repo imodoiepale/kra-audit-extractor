@@ -34,15 +34,6 @@ async function runWhVatExtraction(company, dateRange, downloadPath, progressCall
             progress: 5
         });
 
-        // Read credentials
-        const keysPath = path.join(__dirname, '..', 'KRA', 'keys.json');
-        const keys = JSON.parse(await fs.readFile(keysPath, 'utf-8'));
-        const credentials = keys.find(k => k.pin === company.pin);
-
-        if (!credentials) {
-            throw new Error('No credentials found for this PIN');
-        }
-
         progressCallback({
             log: `Logging in with PIN: ${company.pin}`,
             progress: 10
@@ -50,46 +41,91 @@ async function runWhVatExtraction(company, dateRange, downloadPath, progressCall
 
         // Login
         await page.goto('https://itax.kra.go.ke/KRA-Portal/');
-        await page.fill('input[name="logid"]', credentials.pin);
-        await page.fill('input[id="xxZTT9p2wQ"]', credentials.password);
+        await page.waitForTimeout(1000);
+        
+        await page.locator("#logid").click();
+        await page.locator("#logid").fill(company.pin);
+        await page.evaluate(() => { CheckPIN(); });
 
-        // Handle CAPTCHA
-        await page.locator('#captcha_img').screenshot({ path: './KRA/ocr.png' });
-        const worker = await createWorker('eng');
-        const { data: { text } } = await worker.recognize('./KRA/ocr.png');
+        try {
+            await page.locator('input[name="xxZTT9p2wQ"]').fill(company.password, { timeout: 2000 });
+        } catch (error) {
+            throw new Error('Could not find password field.');
+        }
+        
+        await page.waitForTimeout(1500);
+        progressCallback({ log: 'Solving captcha...' });
+
+        const image = await page.waitForSelector("#captcha_img");
+        const imagePath = path.join(downloadPath, `ocr_wh_vat_${company.pin}.png`);
+        await image.screenshot({ path: imagePath });
+        
+        const worker = await createWorker('eng', 1);
+        let result;
+        
+        const extractResult = async () => {
+            const ret = await worker.recognize(imagePath);
+            const text1 = ret.data.text.slice(0, -1);
+            const text = text1.slice(0, -1);
+            const numbers = text.match(/\d+/g);
+            
+            if (!numbers || numbers.length < 2) {
+                throw new Error("Unable to extract valid numbers from CAPTCHA");
+            }
+
+            if (text.includes("+")) {
+                result = Number(numbers[0]) + Number(numbers[1]);
+            } else if (text.includes("-")) {
+                result = Number(numbers[0]) - Number(numbers[1]);
+            } else {
+                throw new Error("Unsupported arithmetic operator in CAPTCHA");
+            }
+            
+            progressCallback({
+                log: `CAPTCHA solved: ${numbers[0]} ${text.includes("+") ? "+" : "-"} ${numbers[1]} = ${result}`
+            });
+        };
+        
+        let attempts = 0;
+        while (attempts < 5) {
+            try {
+                await extractResult();
+                break;
+            } catch (error) {
+                attempts++;
+                if (attempts >= 5) throw new Error('Failed to solve captcha after multiple attempts.');
+                await page.waitForTimeout(1000);
+                await image.screenshot({ path: imagePath });
+            }
+        }
         await worker.terminate();
 
-        const captchaText = text.replace(/\s/g, '').trim();
-        await page.fill('input[name="captcahText"]', captchaText);
-        await page.click('input[name="btnSubmit"]');
-
-        await page.waitForTimeout(3000);
-
+        await page.type("#captcahText", result.toString());
+        await page.click("#loginButton");
+        
+        await page.waitForTimeout(2000);
+        
         progressCallback({
             log: 'Login successful',
             progress: 20
         });
-
-        // Navigate to Withholding VAT
-        await page.click('a#ddtopmenubar:has-text("Returns")');
-        await page.waitForTimeout(1000);
         
-        await page.click('a:has-text("Filed Returns")');
+        await page.goto('https://itax.kra.go.ke/KRA-Portal/', { waitUntil: 'networkidle' });
         await page.waitForTimeout(2000);
+        
+        // Wait for menu to be available
+        await page.waitForSelector('#ddtopmenubar > ul > li > a', { state: 'visible', timeout: 10000 });
 
         progressCallback({
             log: 'Navigating to Withholding VAT returns...',
             progress: 30
         });
-
-        // Switch to Withholding VAT tab
-        const whVatTab = page.locator('a:has-text("Withholding VAT")').first();
-        if (await whVatTab.count() > 0) {
-            await whVatTab.click();
-            await page.waitForTimeout(2000);
-        } else {
-            throw new Error('Withholding VAT tab not found');
-        }
+        
+        // Navigate to Withholding VAT (menu item #8, not #4)
+        await page.hover('#ddtopmenubar > ul > li:nth-child(8) > a');
+        await page.waitForTimeout(1000);
+        await page.evaluate(() => { consultAndReprintVATWHTCerti(); });
+        await page.waitForTimeout(3000); // Wait longer for page to load
 
         progressCallback({
             log: 'Processing Withholding VAT returns...',
@@ -122,6 +158,7 @@ async function processWhVatReturns(page, company, dateRange, downloadPath, workb
     
     const now = new Date();
     const formattedDateTime = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
+    const formattedDateTime2 = `${now.getDate()}_${now.getMonth() + 1}_${now.getFullYear()}_${now.getHours()}_${now.getMinutes()}`;
     
     // Determine date range
     let startMonth, startYear, endMonth, endYear;
@@ -146,66 +183,124 @@ async function processWhVatReturns(page, company, dateRange, downloadPath, workb
     // Create worksheets for each month/year combination
     const monthYearWorksheets = new Map();
     const allData = [];
+    const extractedPeriods = new Set();
 
     try {
-        // Get all rows from the table
-        const rows = await page.$$('table tbody tr');
+        // Generate list of periods to process
+        const periods = [];
+        for (let year = startYear; year <= endYear; year++) {
+            const monthStart = (year === startYear) ? startMonth : 1;
+            const monthEnd = (year === endYear) ? endMonth : 12;
+            
+            for (let month = monthStart; month <= monthEnd; month++) {
+                periods.push({ month, year });
+            }
+        }
+        
+        progressCallback({
+            log: `Will process ${periods.length} periods from ${getMonthName(startMonth)} ${startYear} to ${getMonthName(endMonth)} ${endYear}`
+        });
+        
         let processedCount = 0;
-
-        for (const row of rows) {
+        
+        // Process each period individually
+        for (const period of periods) {
             try {
-                const cells = await row.$$('td');
-                if (cells.length < 5) continue;
+                const { month, year } = period;
+                const periodKey = `${getMonthName(month)} ${year}`;
+                
+                processedCount++;
+                progressCallback({
+                    log: `Selecting period: ${periodKey} (${processedCount}/${periods.length})...`,
+                    progress: 40 + (processedCount * 50 / periods.length)
+                });
 
-                // Extract data from cells
-                const periodText = await cells[0].textContent();
-                const taxHeadText = await cells[1].textContent();
-                const statusText = await cells[4].textContent();
-
-                // Parse the period (e.g., "10/2024" or "October 2024")
-                let month, year;
-                if (periodText.includes('/')) {
-                    const [m, y] = periodText.split('/');
-                    month = parseInt(m);
-                    year = parseInt(y);
-                } else {
-                    const monthMatch = periodText.match(/([A-Za-z]+)\s+(\d{4})/);
-                    if (monthMatch) {
-                        month = getMonthNumber(monthMatch[1]);
-                        year = parseInt(monthMatch[2]);
-                    }
+                // Select month and year on the WH VAT page
+                try {
+                    // Select month (dropdown #mnth)
+                    await page.selectOption('#mnth', month.toString());
+                    await page.waitForTimeout(500);
+                    
+                    // Select year (dropdown #year)
+                    await page.selectOption('#year', year.toString());
+                    await page.waitForTimeout(500);
+                    
+                    // Handle any dialogs that may appear
+                    page.on('dialog', dialog => dialog.accept().catch(() => {}));
+                    
+                    // Click submit button
+                    await page.click('#submitBtn');
+                    await page.waitForTimeout(1000);
+                    
+                    progressCallback({ log: `Period selected: ${periodKey}` });
+                    
+                } catch (selectError) {
+                    progressCallback({
+                        log: `Error selecting period ${periodKey}: ${selectError.message}`,
+                        logType: 'error'
+                    });
+                    continue;
                 }
 
-                if (!month || !year) continue;
+                // Check if "no records" message appears
+                const noRecords = await page.locator('text=/No records found/i, text=/No data available/i, text=/No records to display/i').first().isVisible().catch(() => false);
+                
+                if (noRecords) {
+                    progressCallback({ log: `No records found for ${periodKey}` });
+                    continue;
+                }
 
-                // Check if within date range
-                const isInRange = (year > startYear || (year === startYear && month >= startMonth)) &&
-                                 (year < endYear || (year === endYear && month <= endMonth));
+                // Wait for table to load
+                await page.waitForTimeout(2000);
+                const table = await page.locator('#jspDiv > table').first().isVisible().catch(() => false);
+                
+                if (!table) {
+                    progressCallback({
+                        log: `No table found for ${periodKey}`,
+                        logType: 'warning'
+                    });
+                    continue;
+                }
 
-                if (!isInRange) continue;
+                // Extract the table data for this period
+                progressCallback({ log: `Extracting data for ${periodKey}...` });
+                
+                const transactions = await extractWhVatTransactions(page);
+                
+                if (!transactions || transactions.length === 0) {
+                    progressCallback({ log: `No transactions extracted for ${periodKey}` });
+                    continue;
+                }
 
-                processedCount++;
-                const periodKey = `${getMonthName(month)} ${year}`;
-
-                progressCallback({
-                    log: `Processing ${periodKey}...`,
-                    progress: 40 + (processedCount * 40 / rows.length)
-                });
+                progressCallback({ log: `Found ${transactions.length} transactions for ${periodKey}` });
+                extractedPeriods.add(periodKey);
 
                 // Get or create worksheet for this period
                 let worksheet;
                 if (!monthYearWorksheets.has(periodKey)) {
-                    worksheet = workbook.addWorksheet(periodKey);
+                    worksheet = workbook.addWorksheet(periodKey.substring(0, 31));
                     monthYearWorksheets.set(periodKey, worksheet);
+
+                    // Add company info
+                    const companyRow = worksheet.addRow([
+                        company.name,
+                        `PIN: ${company.pin}`,
+                        `Extraction Date: ${formattedDateTime}`
+                    ]);
+                    highlightCells(companyRow, 'A', 'I', 'FFADD8E6', true);
+                    worksheet.addRow([]); // Empty row
 
                     // Add headers
                     const headerRow = worksheet.addRow([
-                        'Tax Type',
+                        'Sr No',
+                        'Tax Obligation',
                         'Period',
-                        'Tax Head',
-                        'Status',
-                        'Amount',
-                        'Details'
+                        'Date',
+                        'Reference Number',
+                        'Particulars',
+                        'Type',
+                        'Debit',
+                        'Credit'
                     ]);
                     headerRow.font = { bold: true };
                     headerRow.fill = {
@@ -213,63 +308,33 @@ async function processWhVatReturns(page, company, dateRange, downloadPath, workb
                         pattern: 'solid',
                         fgColor: { argb: 'FF83EBFF' }
                     };
-
-                    // Add company name row
-                    const companyRow = worksheet.addRow([
-                        '', company.name, `Extraction Date: ${formattedDateTime}`
-                    ]);
-                    highlightCells(companyRow, 'B', 'F', 'FFADD8E6', true);
                 } else {
                     worksheet = monthYearWorksheets.get(periodKey);
                 }
 
-                // Check for view link
-                const viewLink = await cells[5].$('a:has-text("View")');
-                
-                if (viewLink) {
-                    // Click view link to get details
-                    await viewLink.click();
-                    await page.waitForTimeout(2000);
-
-                    // Extract detailed information
-                    const details = await extractWhVatDetails(page);
-                    
-                    // Add data row
+                // Add transaction rows
+                transactions.forEach(transaction => {
                     worksheet.addRow([
-                        'Withholding VAT',
-                        periodText,
-                        taxHeadText.trim(),
-                        statusText.trim(),
-                        details.totalAmount || 'N/A',
-                        details.summary || ''
+                        transaction.srNo || '',
+                        transaction.taxObligation || '',
+                        `${getMonthName(month)} ${year}`,
+                        transaction.date || '',
+                        transaction.refNo || '',
+                        transaction.particulars || '',
+                        transaction.type || '',
+                        transaction.debit || '',
+                        transaction.credit || ''
                     ]);
 
                     allData.push({
                         period: periodKey,
-                        taxHead: taxHeadText.trim(),
-                        status: statusText.trim(),
-                        amount: details.totalAmount,
-                        details: details
+                        ...transaction
                     });
-
-                    // Go back
-                    await page.goBack();
-                    await page.waitForTimeout(1500);
-                } else {
-                    // No view link - add basic info
-                    worksheet.addRow([
-                        'Withholding VAT',
-                        periodText,
-                        taxHeadText.trim(),
-                        statusText.trim(),
-                        'N/A',
-                        'No details available'
-                    ]);
-                }
+                });
 
             } catch (error) {
                 progressCallback({
-                    log: `Error processing row: ${error.message}`,
+                    log: `Error processing period ${period.month}/${period.year}: ${error.message}`,
                     logType: 'error'
                 });
             }
@@ -322,6 +387,93 @@ async function processWhVatReturns(page, company, dateRange, downloadPath, workb
             logType: 'error'
         });
         throw error;
+    }
+}
+
+async function extractWhVatTransactions(page) {
+    try {
+        // Wait for transaction table to load
+        await page.waitForTimeout(1000);
+        
+        // Try to find the transaction details table
+        const tableSelectors = [
+            'table#gridGeneralLedgerDtlsTbl',
+            'table.GridViewStyle',
+            'table[id*="Grid"]',
+            'div.GridViewDiv table',
+            'table tbody tr'
+        ];
+        
+        let tableFound = false;
+        for (const selector of tableSelectors) {
+            const count = await page.locator(selector).count();
+            if (count > 0) {
+                tableFound = true;
+                break;
+            }
+        }
+        
+        if (!tableFound) {
+            return [];
+        }
+        
+        // Extract transaction data using evaluate for safety
+        const transactions = await page.evaluate(() => {
+            // Find the main table with transaction data
+            const tables = Array.from(document.querySelectorAll('table'));
+            let transactionTable = null;
+            
+            // Look for table with headers like SR.NO, PERIOD, DATE, etc.
+            for (const table of tables) {
+                const headerText = table.innerText.toLowerCase();
+                if (headerText.includes('sr.no') || 
+                    headerText.includes('period') || 
+                    headerText.includes('particulars')) {
+                    transactionTable = table;
+                    break;
+                }
+            }
+            
+            if (!transactionTable) {
+                // Try to get any table with tbody
+                transactionTable = document.querySelector('table tbody')?.closest('table');
+            }
+            
+            if (!transactionTable) return [];
+            
+            const rows = Array.from(transactionTable.querySelectorAll('tbody tr'));
+            
+            return rows.map(row => {
+                const cells = Array.from(row.querySelectorAll('td'));
+                if (cells.length === 0) return null;
+                
+                // Map cells to transaction data
+                // Common column order: SR.NO, Tax Obligation, Period, Date, Ref No, Particulars, Type, Debit, Credit
+                return {
+                    srNo: cells[0]?.innerText?.trim() || '',
+                    taxObligation: cells[1]?.innerText?.trim() || '',
+                    period: cells[2]?.innerText?.trim() || '',
+                    date: cells[3]?.innerText?.trim() || '',
+                    refNo: cells[4]?.innerText?.trim() || '',
+                    particulars: cells[5]?.innerText?.trim() || '',
+                    type: cells[6]?.innerText?.trim() || '',
+                    debit: cells[7]?.innerText?.trim() || '',
+                    credit: cells[8]?.innerText?.trim() || ''
+                };
+            }).filter(transaction => {
+                // Filter out null and header rows
+                return transaction !== null && 
+                       transaction.srNo && 
+                       !transaction.srNo.toLowerCase().includes('sr.no') &&
+                       !transaction.srNo.toLowerCase().includes('sr no');
+            });
+        });
+        
+        return transactions;
+        
+    } catch (error) {
+        console.error('Error extracting WH VAT transactions:', error);
+        return [];
     }
 }
 
@@ -386,9 +538,14 @@ function getMonthName(month) {
 
 function getMonthNumber(monthName) {
     const months = {
+        // Full names
         'january': 1, 'february': 2, 'march': 3, 'april': 4,
         'may': 5, 'june': 6, 'july': 7, 'august': 8,
-        'september': 9, 'october': 10, 'november': 11, 'december': 12
+        'september': 9, 'october': 10, 'november': 11, 'december': 12,
+        // Abbreviated names
+        'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4,
+        'may': 5, 'jun': 6, 'jul': 7, 'aug': 8,
+        'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dec': 12
     };
     return months[monthName.toLowerCase()];
 }
