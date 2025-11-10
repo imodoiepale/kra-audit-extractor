@@ -357,12 +357,21 @@ function setupEventListeners() {
     if (selectOutputFolder) {
         selectOutputFolder.addEventListener('click', async () => {
             const result = await ipcRenderer.invoke('select-folder');
-            if (result) {
+            if (result && result.success && result.folderPath) {
                 const settingsDownloadPath = document.getElementById('settingsDownloadPath');
                 if (settingsDownloadPath) {
-                    settingsDownloadPath.value = result;
+                    settingsDownloadPath.value = result.folderPath;
                 }
             }
+        });
+    }
+    
+    // Open folder button in sidebar
+    const openFolderBtn = document.getElementById('openFolderBtn');
+    if (openFolderBtn) {
+        openFolderBtn.addEventListener('click', async () => {
+            const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+            await window.openFolder(downloadPath);
         });
     }
     
@@ -2477,7 +2486,8 @@ function displayTCCResults(data) {
     elements.tccResults.classList.remove('hidden');
 }
 
-function viewTCCPDF(filePath) {
+// Expose globally for inline onclick handlers
+window.viewTCCPDF = function(filePath) {
     const pdfViewer = document.getElementById('tccPdfViewer');
     const pdfFrame = document.getElementById('tccPdfFrame');
     
@@ -2487,9 +2497,9 @@ function viewTCCPDF(filePath) {
         pdfFrame.src = fileUrl;
         pdfViewer.classList.remove('hidden');
     }
-}
+};
 
-function closeTCCPDFViewer() {
+window.closeTCCPDFViewer = function() {
     const pdfViewer = document.getElementById('tccPdfViewer');
     const pdfFrame = document.getElementById('tccPdfFrame');
     
@@ -2497,11 +2507,17 @@ function closeTCCPDFViewer() {
         pdfFrame.src = '';
         pdfViewer.classList.add('hidden');
     }
-}
+};
 
-function openFile(filePath) {
+window.openFile = function(filePath) {
     ipcRenderer.send('open-file', filePath);
-}
+};
+
+window.openFolder = async function(folderPath) {
+    if (folderPath) {
+        await ipcRenderer.invoke('open-folder', folderPath);
+    }
+};
 
 async function runAllAutomations() {
     console.log('Run All Automations clicked');

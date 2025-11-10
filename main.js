@@ -68,9 +68,9 @@ ipcMain.handle('select-folder', async () => {
   });
   
   if (!result.canceled && result.filePaths.length > 0) {
-    return result.filePaths[0];
+    return { success: true, folderPath: result.filePaths[0] };
   }
-  return null;
+  return { success: false, folderPath: null };
 });
 
 ipcMain.handle('save-config', async (event, config) => {
