@@ -23,7 +23,7 @@ const elements = {
     // Navigation
     navItems: document.querySelectorAll('.nav-item'),
     tabContents: document.querySelectorAll('.tab-content'),
-    
+
     // Step 1: Company Setup
     kraPin: document.getElementById('kraPin'),
     kraPassword: document.getElementById('kraPassword'),
@@ -32,19 +32,19 @@ const elements = {
     companyDetailsResult: document.getElementById('companyDetailsResult'),
     companyInfo: document.getElementById('companyInfo'),
     confirmCompanyDetails: document.getElementById('confirmCompanyDetails'),
-    
+
     // Step 2: Password Validation
     validationCompanyName: document.getElementById('validationCompanyName'),
     validationPIN: document.getElementById('validationPIN'),
     validationResult: document.getElementById('validationResult'),
     runPasswordValidation: document.getElementById('runPasswordValidation'),
-    
+
     // Step 3: Manufacturer Details
     fetchManufacturerDetails: document.getElementById('fetchManufacturerDetails'),
     exportManufacturerDetails: document.getElementById('exportManufacturerDetails'),
     manufacturerDetailsResult: document.getElementById('manufacturerDetailsResult'),
     manufacturerInfo: document.getElementById('manufacturerInfo'),
-    
+
     // Step 4: Director Details
     runDirectorDetailsExtraction: document.getElementById('runDirectorDetailsExtraction'),
     directorDetailsResults: document.getElementById('directorDetailsResults'),
@@ -60,7 +60,7 @@ const elements = {
     // Step 7: Liabilities
     runLiabilitiesExtraction: document.getElementById('runLiabilitiesExtraction'),
     liabilitiesResults: document.getElementById('liabilitiesResults'),
-    
+
     // Step 7: General Ledger
     runLedgerExtraction: document.getElementById('runLedgerExtraction'),
     ledgerResults: document.getElementById('ledgerResults'),
@@ -68,7 +68,7 @@ const elements = {
     // Tax Compliance
     runTCCDownloader: document.getElementById('runTCCDownloader'),
     tccResults: document.getElementById('tccResults'),
-    
+
     // Step 5: VAT Returns
     vatDateRange: document.getElementsByName('vatDateRange'),
     vatCustomDateInputs: document.getElementById('vatCustomDateInputs'),
@@ -78,7 +78,7 @@ const elements = {
     vatEndMonth: document.getElementById('vatEndMonth'),
     runVATExtraction: document.getElementById('runVATExtraction'),
     vatResults: document.getElementById('vatResults'),
-    
+
     // WH VAT Returns
     whVatDateRange: document.getElementsByName('whVatDateRange'),
     whVatCustomDateInputs: document.getElementById('whVatCustomDateInputs'),
@@ -88,10 +88,10 @@ const elements = {
     whVatEndMonth: document.getElementById('whVatEndMonth'),
     runWhVATExtraction: document.getElementById('runWhVATExtraction'),
     whVatResults: document.getElementById('whVatResults'),
-    
+
     // Step 5: General Ledger
     runLedgerExtraction: document.getElementById('runLedgerExtraction'),
-    
+
     // Step 8: Run All
     selectAllAutomations: document.getElementById('selectAllAutomations'),
     runAllPinDisplay: document.getElementById('runAllPinDisplay'),
@@ -108,7 +108,7 @@ const elements = {
     includeTaxCompliance: document.getElementById('includeTaxCompliance'),
     includeLiabilities: document.getElementById('includeLiabilities'),
     runAllAutomations: document.getElementById('runAllAutomations'),
-    
+
     // VAT Date Range
     vatRangeType: document.getElementById('vatRangeType'),
     vatCustomRange: document.getElementById('vatCustomRange'),
@@ -116,7 +116,7 @@ const elements = {
     vatStartYear: document.getElementById('vatStartYear'),
     vatEndMonth: document.getElementById('vatEndMonth'),
     vatEndYear: document.getElementById('vatEndYear'),
-    
+
     // WH VAT Date Range
     whVatRangeType: document.getElementById('whVatRangeType'),
     whVatCustomRange: document.getElementById('whVatCustomRange'),
@@ -124,7 +124,7 @@ const elements = {
     whVatStartYear: document.getElementById('whVatStartYear'),
     whVatEndMonth: document.getElementById('whVatEndMonth'),
     whVatEndYear: document.getElementById('whVatEndYear'),
-    
+
     // Run All Date Range
     runAllDateRange: document.getElementsByName('runAllDateRange'),
     runAllCustomDateInputs: document.getElementById('runAllCustomDateInputs'),
@@ -132,7 +132,7 @@ const elements = {
     runAllStartYear: document.getElementById('runAllStartYear'),
     runAllEndMonth: document.getElementById('runAllEndMonth'),
     runAllEndYear: document.getElementById('runAllEndYear'),
-    
+
     // Global elements
     progressSection: document.getElementById('progressSection'),
     progressFill: document.getElementById('progressFill'),
@@ -140,9 +140,10 @@ const elements = {
     progressLog: document.getElementById('progressLog'),
     results: document.getElementById('results'),
     resultContent: document.getElementById('resultContent'),
-    
+
     // Configuration
     downloadPath: document.getElementById('downloadPath'),
+    sidebarFolderPath: document.getElementById('sidebarFolderPath'),
     selectFolder: document.getElementById('selectFolder'),
     outputFormat: document.getElementById('outputFormat'),
     saveConfig: document.getElementById('saveConfig'),
@@ -155,18 +156,18 @@ function init() {
     setupEventListeners();
     setDefaultDownloadPath();
     // loadSavedConfig(); // Prevents loading old data on startup
-    
+
     // Initialize date input toggles
     toggleVATDateInputs();
     toggleWhVATDateInputs();
-    
+
     updateUIState();
 }
 
 // Set up event listeners
 function setupEventListeners() {
     console.log('Setting up event listeners...');
-    
+
     // Sidebar navigation items
     elements.navItems.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -174,27 +175,27 @@ function setupEventListeners() {
             switchTab(btn.dataset.tab);
         });
     });
-    
+
     // Step 1: Company Setup
     if (elements.fetchCompanyDetails) {
         elements.fetchCompanyDetails.addEventListener('click', fetchCompanyDetails);
         console.log('Fetch Company Details button listener added');
     }
-    
+
     if (elements.validateCredentials) {
         elements.validateCredentials.addEventListener('click', validateCredentials);
         console.log('Validate Credentials button listener added');
     }
-    
+
     if (elements.confirmCompanyDetails) {
         elements.confirmCompanyDetails.addEventListener('click', confirmCompanyDetails);
     }
-    
+
     // Step 2: Password Validation
     if (elements.runPasswordValidation) {
         elements.runPasswordValidation.addEventListener('click', runPasswordValidation);
     }
-    
+
     // Step 3: Manufacturer Details
     if (elements.fetchManufacturerDetails) {
         elements.fetchManufacturerDetails.addEventListener('click', fetchManufacturerDetails);
@@ -204,7 +205,7 @@ function setupEventListeners() {
     if (elements.runDirectorDetailsExtraction) {
         elements.runDirectorDetailsExtraction.addEventListener('click', runDirectorDetailsExtraction);
     }
-    
+
     if (elements.exportManufacturerDetails) {
         elements.exportManufacturerDetails.addEventListener('click', exportManufacturerDetails);
     }
@@ -213,12 +214,12 @@ function setupEventListeners() {
     if (elements.runObligationCheck) {
         elements.runObligationCheck.addEventListener('click', runObligationCheck);
     }
-    
+
     // Step 6: Agent Checker
     if (elements.runAgentCheck) {
         elements.runAgentCheck.addEventListener('click', runAgentCheck);
     }
-    
+
     // Refresh Profile Button
     const refreshProfileBtn = document.getElementById('refreshProfileBtn');
     if (refreshProfileBtn) {
@@ -231,7 +232,7 @@ function setupEventListeners() {
             });
         });
     }
-    
+
     // Step 7: Liabilities
     if (elements.runLiabilitiesExtraction) {
         elements.runLiabilitiesExtraction.addEventListener('click', runLiabilitiesExtraction);
@@ -241,40 +242,40 @@ function setupEventListeners() {
     elements.vatDateRange.forEach(radio => {
         radio.addEventListener('change', toggleVATDateInputs);
     });
-    
+
     if (elements.runVATExtraction) {
         elements.runVATExtraction.addEventListener('click', runVATExtraction);
     }
-    
+
     // WH VAT Returns
     elements.whVatDateRange.forEach(radio => {
         radio.addEventListener('change', toggleWhVATDateInputs);
     });
-    
+
     if (elements.runWhVATExtraction) {
         elements.runWhVATExtraction.addEventListener('click', runWhVATExtraction);
     }
-    
+
     // Run All - Select All Checkbox
     if (elements.selectAllAutomations) {
         elements.selectAllAutomations.addEventListener('change', toggleAllAutomations);
     }
-    
+
     // Run All - VAT Date Range Dropdown
     if (elements.vatRangeType) {
         elements.vatRangeType.addEventListener('change', toggleVATRangeInputs);
     }
-    
+
     // Run All - WH VAT Date Range Dropdown
     if (elements.whVatRangeType) {
         elements.whVatRangeType.addEventListener('change', toggleWhVATRangeInputs);
     }
-    
+
     // Step 5: General Ledger
     if (elements.runLedgerExtraction) {
         elements.runLedgerExtraction.addEventListener('click', runLedgerExtraction);
     }
-    
+
     // Step 6: Run All
     if (elements.runAllAutomations) {
         elements.runAllAutomations.addEventListener('click', runAllAutomations);
@@ -284,20 +285,20 @@ function setupEventListeners() {
     if (elements.runTCCDownloader) {
         elements.runTCCDownloader.addEventListener('click', runTCCDownloader);
     }
-    
+
     // Configuration
     if (elements.selectFolder) {
         elements.selectFolder.addEventListener('click', selectDownloadFolder);
     }
-    
+
     if (elements.saveConfig) {
         elements.saveConfig.addEventListener('click', saveConfiguration);
     }
-    
+
     if (elements.loadConfig) {
         elements.loadConfig.addEventListener('click', loadConfiguration);
     }
-    
+
     // Settings Modal
     const settingsBtn = document.getElementById('settingsBtn');
     const settingsModal = document.getElementById('settingsModal');
@@ -305,14 +306,14 @@ function setupEventListeners() {
     const cancelSettings = document.getElementById('cancelSettings');
     const saveSettings = document.getElementById('saveSettings');
     const selectOutputFolder = document.getElementById('selectOutputFolder');
-    
+
     if (settingsBtn) {
         settingsBtn.addEventListener('click', () => {
             // Load current settings
             const settingsDownloadPath = document.getElementById('settingsDownloadPath');
             const settingsOutputFormat = document.getElementById('settingsOutputFormat');
             if (settingsDownloadPath) {
-                settingsDownloadPath.value = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+                settingsDownloadPath.value = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
             }
             if (settingsOutputFormat && elements.outputFormat) {
                 settingsOutputFormat.value = elements.outputFormat.value;
@@ -320,31 +321,32 @@ function setupEventListeners() {
             settingsModal?.classList.remove('hidden');
         });
     }
-    
+
     if (closeSettingsModal) {
         closeSettingsModal.addEventListener('click', () => {
             settingsModal?.classList.add('hidden');
         });
     }
-    
+
     if (cancelSettings) {
         cancelSettings.addEventListener('click', () => {
             settingsModal?.classList.add('hidden');
         });
     }
-    
+
     if (saveSettings) {
         saveSettings.addEventListener('click', () => {
             const settingsDownloadPath = document.getElementById('settingsDownloadPath');
             const settingsOutputFormat = document.getElementById('settingsOutputFormat');
-            
+
             if (settingsDownloadPath && elements.downloadPath) {
                 elements.downloadPath.value = settingsDownloadPath.value;
+                updateSidebarFolderPath(settingsDownloadPath.value);
             }
             if (settingsOutputFormat && elements.outputFormat) {
                 elements.outputFormat.value = settingsOutputFormat.value;
             }
-            
+
             settingsModal?.classList.add('hidden');
             showToast({
                 type: 'success',
@@ -353,7 +355,7 @@ function setupEventListeners() {
             });
         });
     }
-    
+
     if (selectOutputFolder) {
         selectOutputFolder.addEventListener('click', async () => {
             const result = await ipcRenderer.invoke('select-folder');
@@ -365,48 +367,48 @@ function setupEventListeners() {
             }
         });
     }
-    
+
     // Open folder button in sidebar
     const openFolderBtn = document.getElementById('openFolderBtn');
     if (openFolderBtn) {
         openFolderBtn.addEventListener('click', async () => {
-            const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+            const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
             await window.openFolder(downloadPath);
         });
     }
-    
+
     // Form validation
     [elements.kraPin, elements.kraPassword].forEach(input => {
         if (input) {
             input.addEventListener('input', updateUIState);
         }
     });
-    
+
     // Progress updates from main process
     ipcRenderer.on('automation-progress', (event, progress) => {
         updateProgress(progress);
     });
-    
+
     console.log('All event listeners set up successfully');
 }
 
 // Tab management
 function switchTab(tabId) {
     console.log('Switching to tab:', tabId);
-    
+
     // Update sidebar navigation items
     elements.navItems.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tabId);
     });
-    
+
     // Update tab content
     elements.tabContents.forEach(content => {
         content.classList.toggle('active', content.id === tabId);
     });
-    
+
     // Update page header
     updatePageHeader(tabId);
-    
+
     // Update current step
     const stepMap = {
         'company-setup': 1,
@@ -424,7 +426,7 @@ function switchTab(tabId) {
         'all-automations': 12
     };
     appState.currentStep = stepMap[tabId] || 1;
-    
+
     // Update displays when switching tabs
     if (tabId === 'password-validation' && appState.companyData) {
         // Update validation tab with company info
@@ -438,7 +440,7 @@ function switchTab(tabId) {
             updateValidationDisplay({ status: appState.validationStatus });
         }
     }
-    
+
     if (tabId === 'manufacturer-details' && appState.companyData) {
         // Show company info on manufacturer details tab
         if (appState.manufacturerData) {
@@ -451,7 +453,7 @@ function switchTab(tabId) {
 function updatePageHeader(tabId) {
     const pageTitle = document.getElementById('pageTitle');
     const pageDescription = document.getElementById('pageDescription');
-    
+
     const titles = {
         'company-setup': {
             title: 'Company Setup',
@@ -506,9 +508,9 @@ function updatePageHeader(tabId) {
             description: 'Execute multiple processes at once'
         }
     };
-    
+
     const info = titles[tabId] || { title: 'KRA Automation Suite', description: '' };
-    
+
     if (pageTitle) {
         pageTitle.textContent = info.title;
     }
@@ -519,7 +521,7 @@ function updatePageHeader(tabId) {
 
 // Set default download path
 function setDefaultDownloadPath() {
-    const defaultPath = path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+    const defaultPath = path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
     if (elements.downloadPath) {
         elements.downloadPath.value = defaultPath;
     }
@@ -530,7 +532,7 @@ function updateUIState() {
     const hasCredentials = elements.kraPin?.value.trim() && elements.kraPassword?.value.trim();
     const hasCompanyData = appState.companyData !== null;
     const hasValidation = appState.hasValidation;
-    
+
     // Update Run All credentials display
     if (appState.companyData) {
         if (elements.runAllPinDisplay) elements.runAllPinDisplay.value = appState.companyData.pin || '';
@@ -541,7 +543,7 @@ function updateUIState() {
         if (elements.runAllPasswordDisplay) elements.runAllPasswordDisplay.value = '';
         if (elements.runAllCompanyDisplay) elements.runAllCompanyDisplay.value = '';
     }
-    
+
     // Step 1 buttons
     if (elements.fetchCompanyDetails) {
         elements.fetchCompanyDetails.disabled = !hasCredentials || appState.isProcessing;
@@ -549,12 +551,12 @@ function updateUIState() {
     if (elements.validateCredentials) {
         elements.validateCredentials.disabled = !hasCredentials || appState.isProcessing;
     }
-    
+
     // Step 2 buttons
     if (elements.runPasswordValidation) {
         elements.runPasswordValidation.disabled = !hasCompanyData || appState.isProcessing;
     }
-    
+
     // Step 3 buttons
     if (elements.fetchManufacturerDetails) {
         elements.fetchManufacturerDetails.disabled = !hasCompanyData || appState.isProcessing;
@@ -584,17 +586,17 @@ function updateUIState() {
     if (elements.runVATExtraction) {
         elements.runVATExtraction.disabled = !hasValidation || appState.isProcessing;
     }
-    
+
     // WH VAT Returns
     if (elements.runWhVATExtraction) {
         elements.runWhVATExtraction.disabled = !hasValidation || appState.isProcessing;
     }
-    
+
     // Step 5 buttons
     if (elements.runLedgerExtraction) {
         elements.runLedgerExtraction.disabled = !hasValidation || appState.isProcessing;
     }
-    
+
     // Step 6 buttons
     if (elements.runAllAutomations) {
         elements.runAllAutomations.disabled = !hasValidation || appState.isProcessing;
@@ -604,7 +606,7 @@ function updateUIState() {
     if (elements.runTCCDownloader) {
         elements.runTCCDownloader.disabled = !hasValidation || appState.isProcessing;
     }
-    
+
     // Update tab completion status
     updateTabCompletionStatus();
 
@@ -676,17 +678,17 @@ function updateUIState() {
 // Update tab completion status
 function updateTabCompletionStatus() {
     const tabs = document.querySelectorAll('.tab-btn');
-    
+
     // Step 1: Company Setup
     if (appState.companyData) {
         tabs[0]?.classList.add('completed');
     }
-    
+
     // Step 2: Password Validation
     if (appState.validationStatus === 'Valid') {
         tabs[1]?.classList.add('completed');
     }
-    
+
     // Step 3: Manufacturer Details
     if (appState.manufacturerData) {
         tabs[2]?.classList.add('completed');
@@ -696,7 +698,7 @@ function updateTabCompletionStatus() {
     if (appState.directorDetails) {
         tabs[3]?.classList.add('completed');
     }
-    
+
     // Step 4 & 5: VAT and Ledger (based on results)
     if (appState.automationResults.vat) {
         tabs[3]?.classList.add('completed');
@@ -722,13 +724,13 @@ function toggleVATDateInputs() {
 // Get VAT date range from form
 function getVATDateRange() {
     const selectedOption = document.querySelector('input[name="vatDateRange"]:checked')?.value;
-    
+
     if (selectedOption === 'custom') {
         const startYear = parseInt(elements.vatStartYear?.value) || new Date().getFullYear();
         const startMonth = parseInt(elements.vatStartMonth?.value) || 1;
         const endYear = parseInt(elements.vatEndYear?.value) || new Date().getFullYear();
         const endMonth = parseInt(elements.vatEndMonth?.value) || 12;
-        
+
         return {
             type: 'custom',
             startYear: startYear,
@@ -744,13 +746,13 @@ function getVATDateRange() {
 // Get Run All date range from form
 function getRunAllDateRange() {
     const selectedOption = document.querySelector('input[name="runAllDateRange"]:checked')?.value;
-    
+
     if (selectedOption === 'custom') {
         const startYear = parseInt(elements.runAllStartYear?.value) || new Date().getFullYear();
         const startMonth = parseInt(elements.runAllStartMonth?.value) || 1;
         const endYear = parseInt(elements.runAllEndYear?.value) || new Date().getFullYear();
         const endMonth = parseInt(elements.runAllEndMonth?.value) || 12;
-        
+
         return {
             type: 'custom',
             startYear: startYear,
@@ -766,7 +768,7 @@ function getRunAllDateRange() {
 // Step 1: Fetch company details from manufacturer API
 async function fetchCompanyDetails() {
     console.log('Fetch Company Details clicked');
-    
+
     const pin = elements.kraPin?.value.trim();
     if (!pin) {
         await showMessage({
@@ -776,12 +778,12 @@ async function fetchCompanyDetails() {
         });
         return;
     }
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Fetching company details...');
-        
+
         console.log('Calling fetch-manufacturer-details with PIN:', pin);
 
         const company = {
@@ -803,10 +805,10 @@ async function fetchCompanyDetails() {
             updateValidationDisplay({ status: 'Not Validated' });
 
             const data = result.data;
-            
+
             // Save manufacturer data for Tab 3
             appState.manufacturerData = data;
-            
+
             appState.companyData = {
                 pin: pin,
                 password: elements.kraPassword?.value.trim(),
@@ -824,23 +826,23 @@ async function fetchCompanyDetails() {
             if (elements.companyDetailsResult) {
                 elements.companyDetailsResult.classList.remove('hidden');
             }
-            
+
             // Automatically export manufacturer details to Excel
             if (elements.progressText) {
                 elements.progressText.textContent = 'Exporting manufacturer details to Excel...';
             }
-            const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
-            
+            const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
+
             const exportResult = await ipcRenderer.invoke('export-manufacturer-details', {
                 company: appState.companyData,
                 data: appState.manufacturerData,
                 downloadPath: downloadPath
             });
-            
+
             if (exportResult.success && elements.progressText) {
                 elements.progressText.textContent = `Saved to: ${exportResult.fileName || 'Consolidated Report'}`;
             }
-            
+
             hideProgressSection();
 
             await showMessage({
@@ -919,8 +921,8 @@ async function validateCredentials() {
         updateUIState();
         showProgressSection('Validating KRA credentials...');
 
-        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
-        
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
+
         const result = await ipcRenderer.invoke('validate-kra-credentials', {
             company: appState.companyData,
             downloadPath: downloadPath
@@ -1057,7 +1059,7 @@ function displayManufacturerDetails(data) {
 
     // Build HTML with comprehensive table
     let html = '<div class="manufacturer-details-container" style="max-height: 600px; overflow-y: auto;">';
-    
+
     detailsSections.forEach(section => {
         html += `
             <div class="details-section" style="margin-bottom: 20px;">
@@ -1073,13 +1075,13 @@ function displayManufacturerDetails(data) {
                     </thead>
                     <tbody>
         `;
-        
+
         section.items.forEach((item, index) => {
             const value = item.value || 'N/A';
             const bgColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
             const valueColor = value === 'N/A' ? '#999' : '#333';
             const valueStyle = value === 'N/A' ? 'font-style: italic;' : '';
-            
+
             html += `
                 <tr style="background-color: ${bgColor};">
                     <td style="padding: 8px 10px; border: 1px solid #ddd; font-weight: 500;">${item.label}</td>
@@ -1087,18 +1089,18 @@ function displayManufacturerDetails(data) {
                 </tr>
             `;
         });
-        
+
         html += `
                     </tbody>
                 </table>
             </div>
         `;
     });
-    
+
     html += '</div>';
-    
+
     elements.manufacturerInfo.innerHTML = html;
-    
+
     if (elements.manufacturerDetailsResult) {
         elements.manufacturerDetailsResult.classList.remove('hidden');
     }
@@ -1210,10 +1212,10 @@ function displayObligationResults(data) {
         `;
 
         allObligations.forEach((obligation, index) => {
-            const statusClass = obligation.status && (obligation.status.toLowerCase().includes('active') || obligation.status.toLowerCase().includes('registered')) ? 'status-badge status-approved' : 
-                               obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'status-badge status-expired' : 
-                               'status-badge';
-            
+            const statusClass = obligation.status && (obligation.status.toLowerCase().includes('active') || obligation.status.toLowerCase().includes('registered')) ? 'status-badge status-approved' :
+                obligation.status && obligation.status.toLowerCase().includes('inactive') ? 'status-badge status-expired' :
+                    'status-badge';
+
             contentHtml += `
                 <tr>
                     <td>${index + 1}</td>
@@ -1248,10 +1250,10 @@ function displayObligationResults(data) {
 function displayAgentCheckResults(data) {
     if (!elements.agentCheckResults) return;
 
-    const vatStatus = data.vat?.isRegistered === true ? 'Registered' : 
-                     data.vat?.isRegistered === false ? 'Not Registered' : 'Unknown';
-    const rentStatus = data.rent?.isRegistered === true ? 'Registered' : 
-                      data.rent?.isRegistered === false ? 'Not Registered' : 'Unknown';
+    const vatStatus = data.vat?.isRegistered === true ? 'Registered' :
+        data.vat?.isRegistered === false ? 'Not Registered' : 'Unknown';
+    const rentStatus = data.rent?.isRegistered === true ? 'Registered' :
+        data.rent?.isRegistered === false ? 'Not Registered' : 'Unknown';
 
     let contentHtml = `
         <div class="extraction-results">
@@ -1318,9 +1320,9 @@ function displayAgentCheckResults(data) {
 
     // VAT Withholding Agent Row
     if (data.vat) {
-        const vatStatusClass = data.vat.isRegistered === true ? 'status-badge status-approved' : 
-                              data.vat.isRegistered === false ? 'status-badge status-expired' : 'status-badge';
-        
+        const vatStatusClass = data.vat.isRegistered === true ? 'status-badge status-approved' :
+            data.vat.isRegistered === false ? 'status-badge status-expired' : 'status-badge';
+
         contentHtml += `
             <tr>
                 <td><strong>VAT Withholding Agent</strong></td>
@@ -1333,9 +1335,9 @@ function displayAgentCheckResults(data) {
 
     // Rent Income Withholding Agent Row
     if (data.rent) {
-        const rentStatusClass = data.rent.isRegistered === true ? 'status-badge status-approved' : 
-                               data.rent.isRegistered === false ? 'status-badge status-expired' : 'status-badge';
-        
+        const rentStatusClass = data.rent.isRegistered === true ? 'status-badge status-approved' :
+            data.rent.isRegistered === false ? 'status-badge status-expired' : 'status-badge';
+
         contentHtml += `
             <tr>
                 <td><strong>Rent Income Withholding Agent</strong></td>
@@ -1358,7 +1360,7 @@ function displayAgentCheckResults(data) {
 
     if (hasVatDetails || hasRentDetails) {
         contentHtml += `<div class="data-section"><div class="section-header"><h4>ℹ️ Additional Details</h4></div>`;
-        
+
         if (hasVatDetails) {
             contentHtml += `
                 <div class="details-subsection">
@@ -1382,7 +1384,7 @@ function displayAgentCheckResults(data) {
             }
             contentHtml += `</ul></div>`;
         }
-        
+
         contentHtml += `</div>`;
     }
 
@@ -1395,7 +1397,7 @@ function displayAgentCheckResults(data) {
 // Step 1: Confirm company details
 async function confirmCompanyDetails() {
     console.log('Confirm Company Details clicked');
-    
+
     if (!appState.companyData) {
         await showMessage({
             type: 'error',
@@ -1404,7 +1406,7 @@ async function confirmCompanyDetails() {
         });
         return;
     }
-    
+
     // Move to next step
     switchTab('password-validation');
 }
@@ -1412,7 +1414,7 @@ async function confirmCompanyDetails() {
 // Step 2: Run password validation
 async function runPasswordValidation() {
     console.log('Run Password Validation clicked');
-    
+
     if (!appState.companyData) {
         await showMessage({
             type: 'error',
@@ -1421,12 +1423,12 @@ async function runPasswordValidation() {
         });
         return;
     }
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Running password validation...');
-        
+
         const result = await ipcRenderer.invoke('run-password-validation', {
             company: {
                 pin: appState.companyData.pin,
@@ -1434,13 +1436,13 @@ async function runPasswordValidation() {
                 name: appState.companyData.name
             }
         });
-        
+
         if (result.success) {
             appState.validationStatus = result.status;
             appState.hasValidation = result.status === 'Valid';
             updateValidationDisplay(result);
             hideProgressSection();
-            
+
             await showMessage({
                 type: result.status === 'Valid' ? 'info' : 'warning',
                 title: 'Validation Complete',
@@ -1466,7 +1468,7 @@ async function runPasswordValidation() {
 // Step 3: Fetch manufacturer details
 async function fetchManufacturerDetails() {
     console.log('Fetch Manufacturer Details clicked');
-    
+
     if (!appState.companyData) {
         await showMessage({
             type: 'error',
@@ -1475,22 +1477,22 @@ async function fetchManufacturerDetails() {
         });
         return;
     }
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Fetching manufacturer details...');
-        
+
         const result = await ipcRenderer.invoke('fetch-manufacturer-details', {
             company: appState.companyData
         });
-        
+
         if (result.success && result.data) {
             appState.manufacturerData = result.data;
             displayManufacturerDetails(result.data);
             refreshFullProfile();
             hideProgressSection();
-            
+
             await showMessage({
                 type: 'info',
                 title: 'Success',
@@ -1516,7 +1518,7 @@ async function fetchManufacturerDetails() {
 // Step 3: Export manufacturer details
 async function exportManufacturerDetails() {
     console.log('Export Manufacturer Details clicked');
-    
+
     if (!appState.manufacturerData) {
         await showMessage({
             type: 'error',
@@ -1525,20 +1527,20 @@ async function exportManufacturerDetails() {
         });
         return;
     }
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Exporting manufacturer details...');
-        
-        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
-        
+
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
+
         const result = await ipcRenderer.invoke('export-manufacturer-details', {
             company: appState.companyData,
             data: appState.manufacturerData,
             downloadPath: downloadPath
         });
-        
+
         if (result.success) {
             hideProgressSection();
             await showMessage({
@@ -1739,11 +1741,11 @@ function displayDirectorDetails(data) {
 // Step 5: Run obligation check
 async function runObligationCheck() {
     console.log('Run Obligation Check clicked');
-    
+
     // Check if we have the required credentials
     const pin = elements.kraPin?.value?.trim();
     const password = elements.kraPassword?.value?.trim();
-    
+
     if (!pin || !password) {
         await showMessage({
             type: 'error',
@@ -1752,17 +1754,17 @@ async function runObligationCheck() {
         });
         return;
     }
-    
+
     // Use company data if available, otherwise use form inputs
     const companyName = appState.companyData?.name || 'Unknown Company';
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Running obligation check...');
-        
-        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
-        
+
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
+
         const result = await ipcRenderer.invoke('run-obligation-check', {
             company: {
                 pin: pin,
@@ -1771,13 +1773,13 @@ async function runObligationCheck() {
             },
             downloadPath: downloadPath
         });
-        
+
         if (result.success) {
             appState.obligationData = result.data; // Save obligation data to app state
             displayObligationResults(result.data);
             refreshFullProfile();
             hideProgressSection();
-            
+
             await showMessage({
                 type: 'info',
                 title: 'Obligation Check Complete',
@@ -1803,10 +1805,10 @@ async function runObligationCheck() {
 // Step 6: Run agent check
 async function runAgentCheck() {
     console.log('Run Agent Check clicked');
-    
+
     // Check if we have company data
     const pin = elements.kraPin?.value?.trim();
-    
+
     if (!pin) {
         await showMessage({
             type: 'error',
@@ -1815,17 +1817,17 @@ async function runAgentCheck() {
         });
         return;
     }
-    
+
     // Use company data if available
     const companyName = appState.companyData?.name || 'Unknown Company';
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Checking withholding agent status...');
-        
-        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
-        
+
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
+
         const result = await ipcRenderer.invoke('run-agent-check', {
             company: {
                 pin: pin,
@@ -1833,13 +1835,13 @@ async function runAgentCheck() {
             },
             downloadPath: downloadPath
         });
-        
+
         if (result.success) {
             appState.agentData = result.data; // Save agent check data to app state
             displayAgentCheckResults(result.data);
             refreshFullProfile();
             hideProgressSection();
-            
+
             await showMessage({
                 type: 'info',
                 title: 'Agent Check Complete',
@@ -1865,7 +1867,7 @@ async function runAgentCheck() {
 // Step 7: Run liabilities extraction
 async function runLiabilitiesExtraction() {
     console.log('Run Liabilities Extraction clicked');
-    
+
     if (!appState.companyData || !appState.hasValidation) {
         await showMessage({
             type: 'error',
@@ -1874,14 +1876,14 @@ async function runLiabilitiesExtraction() {
         });
         return;
     }
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Extracting liabilities...');
-        
-        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
-        
+
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
+
         const result = await ipcRenderer.invoke('run-liabilities-extraction', {
             company: {
                 pin: appState.companyData.pin,
@@ -1890,7 +1892,7 @@ async function runLiabilitiesExtraction() {
             },
             downloadPath: downloadPath
         });
-        
+
         if (result.success) {
             appState.liabilitiesData = result.data || { completed: true }; // Save liabilities data to app state
             displayLiabilitiesResults(result);
@@ -1921,7 +1923,7 @@ async function runLiabilitiesExtraction() {
 // Step 6: Run VAT extraction
 async function runVATExtraction() {
     console.log('Run VAT Extraction clicked');
-    
+
     if (!appState.companyData || !appState.hasValidation) {
         await showMessage({
             type: 'error',
@@ -1930,22 +1932,22 @@ async function runVATExtraction() {
         });
         return;
     }
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
-        
+
         // Clear previous results
         if (elements.vatResults) {
             elements.vatResults.classList.add('hidden');
             elements.vatResults.innerHTML = '';
         }
-        
+
         showProgressSection('Extracting VAT returns...');
-        
-        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
         const dateRange = getVATDateRange(); // Get date range from form
-        
+
         const result = await ipcRenderer.invoke('run-vat-extraction', {
             company: {
                 pin: appState.companyData.pin,
@@ -1955,12 +1957,12 @@ async function runVATExtraction() {
             dateRange: dateRange,
             downloadPath: downloadPath
         });
-        
+
         if (result.success) {
             appState.vatData = result.data || { completed: true }; // Save VAT data to app state
             refreshFullProfile();
             hideProgressSection();
-            
+
             // Show success message in UI
             if (elements.vatResults) {
                 elements.vatResults.innerHTML = `
@@ -1970,15 +1972,15 @@ async function runVATExtraction() {
                         <p><strong>Files saved to:</strong> ${result.downloadPath}</p>
                         <p><strong>Total returns processed:</strong> ${result.totalReturns || 0}</p>
                         <p><strong>Extraction date:</strong> ${new Date().toLocaleString()}</p>
-                        ${result.files && result.files.length > 0 ? 
-                            `<p><strong>Generated files:</strong></p>
-                             <ul>${result.files.map(file => `<li>${file.split('\\').pop()}</li>`).join('')}</ul>` 
-                            : ''}
+                        ${result.files && result.files.length > 0 ?
+                        `<p><strong>Generated files:</strong></p>
+                             <ul>${result.files.map(file => `<li>${file.split('\\').pop()}</li>`).join('')}</ul>`
+                        : ''}
                     </div>
                 `;
                 elements.vatResults.classList.remove('hidden');
             }
-            
+
             // Also show popup message
             await showMessage({
                 type: 'info',
@@ -1990,7 +1992,7 @@ async function runVATExtraction() {
         }
     } catch (error) {
         console.error('Error running VAT extraction:', error);
-        
+
         // Show error message in UI
         if (elements.vatResults) {
             elements.vatResults.innerHTML = `
@@ -2002,7 +2004,7 @@ async function runVATExtraction() {
             `;
             elements.vatResults.classList.remove('hidden');
         }
-        
+
         await showMessage({
             type: 'error',
             title: 'VAT Extraction Error',
@@ -2075,13 +2077,13 @@ function toggleWhVATRangeInputs() {
 // Run All: Get individual VAT date range
 function getIndividualVATDateRange() {
     const rangeType = elements.vatRangeType?.value;
-    
+
     if (rangeType === 'custom') {
         const startYear = parseInt(elements.vatStartYear?.value) || new Date().getFullYear();
         const startMonth = parseInt(elements.vatStartMonth?.value) || 1;
         const endYear = parseInt(elements.vatEndYear?.value) || new Date().getFullYear();
         const endMonth = parseInt(elements.vatEndMonth?.value) || 12;
-        
+
         return {
             type: 'custom',
             startYear: startYear,
@@ -2097,13 +2099,13 @@ function getIndividualVATDateRange() {
 // Run All: Get individual WH VAT date range
 function getIndividualWhVATDateRange() {
     const rangeType = elements.whVatRangeType?.value;
-    
+
     if (rangeType === 'custom') {
         const startYear = parseInt(elements.whVatStartYear?.value) || new Date().getFullYear();
         const startMonth = parseInt(elements.whVatStartMonth?.value) || 1;
         const endYear = parseInt(elements.whVatEndYear?.value) || new Date().getFullYear();
         const endMonth = parseInt(elements.whVatEndMonth?.value) || 12;
-        
+
         return {
             type: 'custom',
             startYear: startYear,
@@ -2119,22 +2121,22 @@ function getIndividualWhVATDateRange() {
 // WH VAT: Get date range from form
 function getWhVATDateRange() {
     const selectedRange = document.querySelector('input[name="whVatDateRange"]:checked')?.value;
-    
+
     console.log('WH VAT Date Range Selection:', selectedRange);
-    
+
     if (selectedRange === 'all') {
         console.log('WH VAT: Extracting all available data');
         return 'all';
     }
-    
+
     // Custom range
     const startMonth = parseInt(elements.whVatStartMonth?.value || 1);
     const startYear = parseInt(elements.whVatStartYear?.value || new Date().getFullYear());
     const endMonth = parseInt(elements.whVatEndMonth?.value || 12);
     const endYear = parseInt(elements.whVatEndYear?.value || new Date().getFullYear());
-    
+
     console.log(`WH VAT Custom Range: ${startMonth}/${startYear} to ${endMonth}/${endYear}`);
-    
+
     // Validate date range
     if (startYear > endYear || (startYear === endYear && startMonth > endMonth)) {
         console.warn('Invalid date range: Start date is after end date');
@@ -2144,7 +2146,7 @@ function getWhVATDateRange() {
             message: 'Start date must be before or equal to end date'
         });
     }
-    
+
     return {
         startMonth: startMonth,
         startYear: startYear,
@@ -2156,7 +2158,7 @@ function getWhVATDateRange() {
 // WH VAT: Run extraction
 async function runWhVATExtraction() {
     console.log('Run WH VAT Extraction clicked');
-    
+
     if (!appState.companyData || !appState.hasValidation) {
         await showMessage({
             type: 'error',
@@ -2165,22 +2167,22 @@ async function runWhVATExtraction() {
         });
         return;
     }
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
-        
+
         // Clear previous results
         if (elements.whVatResults) {
             elements.whVatResults.classList.add('hidden');
             elements.whVatResults.innerHTML = '';
         }
-        
+
         showProgressSection('Extracting Withholding VAT returns...');
-        
-        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
         const dateRange = getWhVATDateRange();
-        
+
         const result = await ipcRenderer.invoke('run-wh-vat-extraction', {
             company: {
                 pin: appState.companyData.pin,
@@ -2190,12 +2192,12 @@ async function runWhVATExtraction() {
             dateRange: dateRange,
             downloadPath: downloadPath
         });
-        
+
         if (result.success) {
             appState.whVatData = result.data || { completed: true };
             refreshFullProfile();
             hideProgressSection();
-            
+
             // Show success message in UI
             if (elements.whVatResults) {
                 elements.whVatResults.innerHTML = `
@@ -2204,15 +2206,15 @@ async function runWhVATExtraction() {
                         <p><strong>Status:</strong> Successfully extracted Withholding VAT returns</p>
                         <p><strong>Files saved to:</strong> ${result.downloadPath}</p>
                         <p><strong>Extraction date:</strong> ${new Date().toLocaleString()}</p>
-                        ${result.files && result.files.length > 0 ? 
-                            `<p><strong>Generated files:</strong></p>
-                             <ul>${result.files.map(file => `<li>${file.split('\\').pop()}</li>`).join('')}</ul>` 
-                            : ''}
+                        ${result.files && result.files.length > 0 ?
+                        `<p><strong>Generated files:</strong></p>
+                             <ul>${result.files.map(file => `<li>${file.split('\\').pop()}</li>`).join('')}</ul>`
+                        : ''}
                     </div>
                 `;
                 elements.whVatResults.classList.remove('hidden');
             }
-            
+
             await showMessage({
                 type: 'info',
                 title: 'WH VAT Extraction Complete',
@@ -2223,7 +2225,7 @@ async function runWhVATExtraction() {
         }
     } catch (error) {
         console.error('Error running WH VAT extraction:', error);
-        
+
         // Show error message in UI
         if (elements.whVatResults) {
             elements.whVatResults.innerHTML = `
@@ -2235,7 +2237,7 @@ async function runWhVATExtraction() {
             `;
             elements.whVatResults.classList.remove('hidden');
         }
-        
+
         await showMessage({
             type: 'error',
             title: 'WH VAT Extraction Error',
@@ -2251,7 +2253,7 @@ async function runWhVATExtraction() {
 // Step 7: Run ledger extraction
 async function runLedgerExtraction() {
     console.log('Run Ledger Extraction clicked');
-    
+
     if (!appState.companyData || !appState.hasValidation) {
         await showMessage({
             type: 'error',
@@ -2260,14 +2262,14 @@ async function runLedgerExtraction() {
         });
         return;
     }
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Extracting general ledger...');
-        
-        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
-        
+
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
+
         const result = await ipcRenderer.invoke('run-ledger-extraction', {
             company: {
                 pin: appState.companyData.pin,
@@ -2276,7 +2278,7 @@ async function runLedgerExtraction() {
             },
             downloadPath: downloadPath
         });
-        
+
         if (result.success) {
             appState.ledgerData = result.data || { completed: true }; // Save ledger data to app state
             displayLedgerResults(result);
@@ -2405,19 +2407,26 @@ function displayTCCResults(data) {
                 </div>
             </div>
     `;
-    
+
     // File info section
     if (data.files && data.files.length > 0) {
+        // Escape file path for HTML - replace backslashes with double backslashes
+        const escapedPath = data.files[0].replace(/\\/g, '\\\\');
         contentHtml += `
             <div class="data-section">
                 <div class="section-header">
                     <h4>📁 Downloaded File</h4>
                 </div>
                 <div class="file-info-box">
-                    <p><strong>File Location:</strong> <a href="#" onclick="openFile('${data.files[0]}')">${data.files[0]}</a></p>
-                    <button class="btn btn-primary" onclick="viewTCCPDF('${data.files[0]}')">
-                        <span>👁️</span> View PDF
-                    </button>
+                    <p><strong>File Location:</strong> <a href="#" onclick="window.openFile('${escapedPath}')">${data.files[0]}</a></p>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button class="btn btn-primary" onclick="window.viewTCCPDF('${escapedPath}')">
+                            <span>👁️</span> View in App
+                        </button>
+                        <button class="btn btn-secondary" onclick="window.openPDFExternal('${escapedPath}')">
+                            <span>🔗</span> Open Externally
+                        </button>
+                    </div>
                 </div>
             </div>`;
     }
@@ -2442,14 +2451,14 @@ function displayTCCResults(data) {
                         </tr>
                     </thead>
                     <tbody>`;
-        
+
         data.tableData.forEach(row => {
             const isApproved = row.status.toLowerCase() === 'approved';
             const isExpired = row.status.toLowerCase() === 'expired';
-            const statusClass = isApproved ? 'status-badge status-approved' : 
-                              isExpired ? 'status-badge status-expired' : 'status-badge';
+            const statusClass = isApproved ? 'status-badge status-approved' :
+                isExpired ? 'status-badge status-expired' : 'status-badge';
             const statusText = isApproved ? 'Valid' : row.status;
-            
+
             contentHtml += `
                         <tr>
                             <td>${row.srNo}</td>
@@ -2461,7 +2470,7 @@ function displayTCCResults(data) {
                             <td>${row.serialNo}</td>
                         </tr>`;
         });
-        
+
         contentHtml += `
                     </tbody>
                 </table>
@@ -2487,44 +2496,79 @@ function displayTCCResults(data) {
 }
 
 // Expose globally for inline onclick handlers
-window.viewTCCPDF = async function(filePath) {
+window.viewTCCPDF = function (filePath) {
     try {
-        // Open PDF in system default viewer instead of iframe (more reliable)
-        await ipcRenderer.invoke('open-file-external', filePath);
+        console.log('Opening PDF in app viewer:', filePath);
+        const pdfViewer = document.getElementById('tccPdfViewer');
+        const pdfFrame = document.getElementById('tccPdfFrame');
+
+        if (pdfViewer && pdfFrame) {
+            // Convert Windows path to file:// URL
+            const fileUrl = `file:///${filePath.replace(/\\/g, '/')}`;
+            console.log('Loading PDF from URL:', fileUrl);
+
+            pdfFrame.src = fileUrl;
+            pdfViewer.classList.remove('hidden');
+        } else {
+            console.error('PDF viewer elements not found');
+        }
     } catch (error) {
         console.error('Error opening PDF:', error);
-        await showMessage({
-            type: 'error',
-            title: 'Cannot Open PDF',
-            message: `Failed to open PDF file: ${error.message}`
-        });
+        alert(`Failed to open PDF file: ${error.message}\n\nFile: ${filePath}`);
     }
 };
 
-window.closeTCCPDFViewer = function() {
+window.closeTCCPDFViewer = function () {
     const pdfViewer = document.getElementById('tccPdfViewer');
     const pdfFrame = document.getElementById('tccPdfFrame');
-    
+
     if (pdfViewer && pdfFrame) {
         pdfFrame.src = '';
         pdfViewer.classList.add('hidden');
     }
 };
 
-window.openFile = async function(filePath) {
+window.openFile = async function (filePath) {
     try {
-        await ipcRenderer.invoke('open-file-external', filePath);
+        console.log('Opening file:', filePath);
+        const result = await ipcRenderer.invoke('open-file-external', filePath);
+
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to open file');
+        }
+
+        console.log('File opened successfully');
     } catch (error) {
         console.error('Error opening file:', error);
         await showMessage({
             type: 'error',
             title: 'Cannot Open File',
-            message: `Failed to open file: ${error.message}`
+            message: `Failed to open file: ${error.message}\n\nFile: ${filePath}`
         });
     }
 };
 
-window.openFolder = async function(folderPath) {
+window.openPDFExternal = async function (filePath) {
+    try {
+        console.log('Opening PDF externally:', filePath);
+        const result = await ipcRenderer.invoke('open-file-external', filePath);
+
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to open PDF file');
+        }
+
+        console.log('PDF opened externally');
+    } catch (error) {
+        console.error('Error opening PDF externally:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Cannot Open PDF',
+            message: `Failed to open PDF file: ${error.message}\n\nFile: ${filePath}`
+        });
+    }
+};
+
+window.openFolder = async function (folderPath) {
     if (folderPath) {
         await ipcRenderer.invoke('open-folder', folderPath);
     }
@@ -2532,7 +2576,7 @@ window.openFolder = async function(folderPath) {
 
 async function runAllAutomations() {
     console.log('Run All Automations clicked');
-    
+
     if (!appState.companyData || !appState.hasValidation) {
         await showMessage({
             type: 'error',
@@ -2541,7 +2585,7 @@ async function runAllAutomations() {
         });
         return;
     }
-    
+
     const selectedAutomations = {
         passwordValidation: elements.includePasswordValidation?.checked || false,
         manufacturerDetails: elements.includeManufacturerDetails?.checked || false,
@@ -2554,7 +2598,7 @@ async function runAllAutomations() {
         taxCompliance: elements.includeTaxCompliance?.checked || false,
         liabilities: elements.includeLiabilities?.checked || false
     };
-    
+
     const hasSelected = Object.values(selectedAutomations).some(selected => selected);
     if (!hasSelected) {
         await showMessage({
@@ -2564,18 +2608,18 @@ async function runAllAutomations() {
         });
         return;
     }
-    
+
     try {
         appState.isProcessing = true;
         updateUIState();
         showProgressSection('Running selected automations...');
-        
-        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA-Automations');
-        
+
+        const downloadPath = elements.downloadPath?.value || path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
+
         // Get individual date ranges for VAT and WH VAT
         const vatDateRange = getIndividualVATDateRange();
         const whVatDateRange = getIndividualWhVATDateRange();
-        
+
         const result = await ipcRenderer.invoke('run-all-automations', {
             company: appState.companyData,
             selectedAutomations,
@@ -2583,7 +2627,7 @@ async function runAllAutomations() {
             whVatDateRange: whVatDateRange,
             downloadPath: downloadPath
         });
-        
+
         if (result.success) {
             hideProgressSection();
             await showMessage({
@@ -2631,7 +2675,7 @@ async function saveConfiguration() {
             downloadPath: elements.downloadPath?.value || '',
             outputFormat: elements.outputFormat?.value || 'xlsx'
         };
-        
+
         const result = await ipcRenderer.invoke('save-config', config);
         if (result.success) {
             await showMessage({
@@ -2657,7 +2701,7 @@ async function loadConfiguration() {
             const config = result.config;
             if (elements.downloadPath) elements.downloadPath.value = config.downloadPath || '';
             if (elements.outputFormat) elements.outputFormat.value = config.outputFormat || 'xlsx';
-            
+
             await showMessage({
                 type: 'info',
                 title: 'Configuration Loaded',
@@ -2705,11 +2749,11 @@ function updateProgress(progress) {
             percentageEl.textContent = `${Math.round(progress.percentage)}%`;
         }
     }
-    
+
     if (progress.message && elements.progressText) {
         elements.progressText.textContent = progress.message;
     }
-    
+
     if (progress.log && elements.progressLog) {
         const logEntry = document.createElement('div');
         logEntry.textContent = progress.log;
@@ -2723,7 +2767,7 @@ function updateCompanyBadge() {
     const badge = document.getElementById('companyBadge');
     const nameEl = document.getElementById('badgeCompanyName');
     const pinEl = document.getElementById('badgeCompanyPin');
-    
+
     if (appState.companyData && badge && nameEl && pinEl) {
         nameEl.textContent = appState.companyData.name || 'Company';
         pinEl.textContent = `PIN: ${appState.companyData.pin || '-'}`;
@@ -2737,21 +2781,21 @@ function updateCompanyBadge() {
 function refreshFullProfile() {
     const profileEmpty = document.getElementById('profileEmptyState');
     const profileView = document.getElementById('profileDataView');
-    
+
     if (!profileEmpty || !profileView) return;
-    
+
     // Check if we have ANY data - including ALL extraction types
-    const hasData = appState.companyData || 
-                    appState.manufacturerData || 
-                    appState.obligationData || 
-                    appState.vatData || 
-                    appState.whVatData ||
-                    appState.ledgerData || 
-                    appState.liabilitiesData ||
-                    appState.directorDetails ||
-                    appState.agentData ||
-                    appState.tccData;
-    
+    const hasData = appState.companyData ||
+        appState.manufacturerData ||
+        appState.obligationData ||
+        appState.vatData ||
+        appState.whVatData ||
+        appState.ledgerData ||
+        appState.liabilitiesData ||
+        appState.directorDetails ||
+        appState.agentData ||
+        appState.tccData;
+
     if (hasData) {
         profileEmpty.classList.add('hidden');
         profileView.classList.remove('hidden');
@@ -2771,14 +2815,14 @@ function updateProfileCards() {
         const pin = document.getElementById('profilePin');
         const vatStatus = document.getElementById('profileVatStatus');
         const etimsStatus = document.getElementById('profileEtimsStatus');
-        
+
         if (initials && appState.companyData.name) {
             const nameWords = appState.companyData.name.split(' ');
             initials.textContent = nameWords.map(w => w[0]).join('').substring(0, 2).toUpperCase();
         }
         if (companyName) companyName.textContent = appState.companyData.name || 'Company Name';
         if (pin) pin.textContent = `PIN: ${appState.companyData.pin || '-'}`;
-        
+
         // Update VAT status badge
         if (vatStatus && appState.manufacturerData) {
             const vatReg = appState.manufacturerData.taxTypeRDtoList?.find(t => t.taxType === 'VAT');
@@ -2787,7 +2831,7 @@ function updateProfileCards() {
                 vatStatus.className = `badge ${vatReg.registrationStatus === 'Active' ? 'badge-success' : 'badge-gray'}`;
             }
         }
-        
+
         // Update eTIMS status badge
         if (etimsStatus && appState.manufacturerData) {
             const etimsReg = appState.manufacturerData.electronicTaxInvoicing;
@@ -2798,7 +2842,7 @@ function updateProfileCards() {
             }
         }
     }
-    
+
     // 2. Update Business Details (Manufacturer Data) - SHOW ALL DATA
     const mfgCard = document.getElementById('profileManufacturerCard');
     const mfgData = document.getElementById('profileManufacturerData');
@@ -2809,7 +2853,7 @@ function updateProfileCards() {
         const address = appState.manufacturerData.manAddRDtlDTO || {};
         const taxTypes = appState.manufacturerData.taxTypeRDtoList || [];
         const etims = appState.manufacturerData.electronicTaxInvoicing || {};
-        
+
         let html = `
             <h5 style="margin-bottom: 10px;">Basic Information</h5>
             <table class="data-table" style="margin-bottom: 15px;">
@@ -2824,7 +2868,7 @@ function updateProfileCards() {
                 </tbody>
             </table>
         `;
-        
+
         if (taxTypes.length > 0) {
             html += `
                 <h5 style="margin-bottom: 10px;">Tax Registrations</h5>
@@ -2849,7 +2893,7 @@ function updateProfileCards() {
             });
             html += `</tbody></table>`;
         }
-        
+
         if (etims) {
             html += `
                 <h5 style="margin-bottom: 10px;">Electronic Tax Invoicing</h5>
@@ -2861,20 +2905,20 @@ function updateProfileCards() {
                 </table>
             `;
         }
-        
+
         mfgData.innerHTML = html;
         if (mfgCard) {
             const statusDot = mfgCard.querySelector('.status-dot');
             if (statusDot) statusDot.className = 'status-dot status-success';
         }
     }
-    
+
     // 3. Update Tax Obligations - SHOW ALL DATA IN TABLE
     const obCard = document.getElementById('profileObligationsCard');
     const obData = document.getElementById('profileObligationsData');
     if (obData && appState.obligationData) {
         const obligations = appState.obligationData.obligations || [];
-        
+
         let html = `
             <h5 style="margin-bottom: 10px;">Taxpayer Status</h5>
             <table class="data-table" style="margin-bottom: 15px;">
@@ -2886,7 +2930,7 @@ function updateProfileCards() {
                 </tbody>
             </table>
         `;
-        
+
         if (obligations.length > 0) {
             html += `
                 <h5 style="margin-bottom: 10px;">Tax Obligations (${obligations.length})</h5>
@@ -2915,21 +2959,21 @@ function updateProfileCards() {
             });
             html += `</tbody></table>`;
         }
-        
+
         obData.innerHTML = html;
         if (obCard) {
             const statusDot = obCard.querySelector('.status-dot');
             if (statusDot) statusDot.className = 'status-dot status-success';
         }
     }
-    
+
     // 4. Update Liabilities
     const liabCard = document.getElementById('profileLiabilitiesCard');
     const liabData = document.getElementById('profileLiabilitiesData');
     if (liabData && appState.liabilitiesData) {
         const totalAmount = appState.liabilitiesData.totalAmount || 0;
         const recordCount = appState.liabilitiesData.recordCount || (Array.isArray(appState.liabilitiesData) ? appState.liabilitiesData.length : 0);
-        
+
         liabData.innerHTML = `
             <div class="profile-summary">
                 <div class="summary-item">
@@ -2950,14 +2994,14 @@ function updateProfileCards() {
             if (statusDot) statusDot.className = `status-dot ${totalAmount === 0 ? 'status-success' : 'status-error'}`;
         }
     }
-    
+
     // 5. Update VAT Returns
     const vatCard = document.getElementById('profileVatCard');
     const vatData = document.getElementById('profileVatData');
     if (vatData && appState.vatData) {
         const totalReturns = appState.vatData.totalReturns || 0;
         const completed = appState.vatData.completed || false;
-        
+
         vatData.innerHTML = `
             <div class="profile-summary">
                 <div class="summary-item">
@@ -2975,7 +3019,7 @@ function updateProfileCards() {
             if (statusDot) statusDot.className = 'status-dot status-success';
         }
     }
-    
+
     // 6. Update Withholding Agent Status - SHOW ALL DATA
     const agentCard = document.getElementById('profileAgentCard');
     const agentData = document.getElementById('profileAgentData');
@@ -2986,7 +3030,7 @@ function updateProfileCards() {
         const rentStatus = appState.agentData.rentWithholdingAgent?.status || 'Unknown';
         const confirmedPin = appState.agentData.vatAgentDetails?.confirmedPin || appState.agentData.rentAgentDetails?.confirmedPin || 'N/A';
         const taxpayerName = appState.agentData.vatAgentDetails?.taxpayerName || appState.agentData.rentAgentDetails?.taxpayerName || 'N/A';
-        
+
         let html = `
             <h5 style="margin-bottom: 10px;">Agent Status</h5>
             <table class="data-table" style="margin-bottom: 15px;">
@@ -3002,7 +3046,7 @@ function updateProfileCards() {
                 </tbody>
             </table>
         `;
-        
+
         if (isVatAgent || isRentAgent) {
             html += `
                 <h5 style="margin-bottom: 10px;">Agent Details</h5>
@@ -3014,21 +3058,21 @@ function updateProfileCards() {
                 </table>
             `;
         }
-        
+
         agentData.innerHTML = html;
         if (agentCard) {
             const statusDot = agentCard.querySelector('.status-dot');
             if (statusDot) statusDot.className = 'status-dot status-success';
         }
     }
-    
+
     // 7. Update Director Details - SHOW ALL DATA IN TABLES
     const directorCard = document.getElementById('profileDirectorCard');
     const directorData = document.getElementById('profileDirectorData');
     if (directorData && appState.directorDetails) {
         const directors = appState.directorDetails.directors || [];
         const activities = appState.directorDetails.activities || [];
-        
+
         let html = `
             <h5 style="margin-bottom: 10px;">Accounting Information</h5>
             <table class="data-table" style="margin-bottom: 15px;">
@@ -3037,7 +3081,7 @@ function updateProfileCards() {
                 </tbody>
             </table>
         `;
-        
+
         if (activities.length > 0) {
             html += `
                 <h5 style="margin-bottom: 10px;">Economic Activities (${activities.length})</h5>
@@ -3062,7 +3106,7 @@ function updateProfileCards() {
             });
             html += `</tbody></table>`;
         }
-        
+
         if (directors.length > 0) {
             html += `
                 <h5 style="margin-bottom: 10px;">Directors & Associates (${directors.length})</h5>
@@ -3093,21 +3137,21 @@ function updateProfileCards() {
             });
             html += `</tbody></table>`;
         }
-        
+
         directorData.innerHTML = html;
         if (directorCard) {
             const statusDot = directorCard.querySelector('.status-dot');
             if (statusDot) statusDot.className = 'status-dot status-success';
         }
     }
-    
+
     // 8. Update Withholding VAT
     const whVatCard = document.getElementById('profileWhVatCard');
     const whVatData = document.getElementById('profileWhVatData');
     if (whVatData && appState.whVatData) {
         const completed = appState.whVatData.completed || false;
         const totalReturns = appState.whVatData.totalReturns || 0;
-        
+
         whVatData.innerHTML = `
             <div class="profile-summary">
                 <div class="summary-item">
@@ -3125,13 +3169,13 @@ function updateProfileCards() {
             if (statusDot) statusDot.className = 'status-dot status-success';
         }
     }
-    
+
     // 9. Update General Ledger
     const ledgerCard = document.getElementById('profileLedgerCard');
     const ledgerData = document.getElementById('profileLedgerData');
     if (ledgerData && appState.ledgerData) {
         const completed = appState.ledgerData.completed || false;
-        
+
         ledgerData.innerHTML = `
             <div class="profile-summary">
                 <div class="summary-item">
@@ -3151,13 +3195,13 @@ function updateProfileCards() {
             if (statusDot) statusDot.className = 'status-dot status-success';
         }
     }
-    
+
     // 10. Update TCC
     const tccCard = document.getElementById('profileTccCard');
     const tccData = document.getElementById('profileTccData');
     if (tccData && appState.tccData) {
         const downloaded = appState.tccData.downloaded || appState.tccData.success || false;
-        
+
         tccData.innerHTML = `
             <div class="profile-summary">
                 <div class="summary-item">
@@ -3177,12 +3221,12 @@ function updateProfileCards() {
             if (statusDot) statusDot.className = `status-dot ${downloaded ? 'status-success' : 'status-pending'}`;
         }
     }
-    
+
     // 11. Update Generated Files
     const filesData = document.getElementById('profileFilesData');
     if (filesData) {
         const allFiles = [];
-        
+
         // Collect file info from various extractions
         if (appState.companyData?.exportPath) allFiles.push({ name: 'Company Details', path: appState.companyData.exportPath });
         if (appState.vatData?.downloadPath) allFiles.push({ name: 'VAT Returns', path: appState.vatData.downloadPath });
@@ -3190,7 +3234,7 @@ function updateProfileCards() {
         if (appState.liabilitiesData?.downloadPath) allFiles.push({ name: 'Liabilities', path: appState.liabilitiesData.downloadPath });
         if (appState.ledgerData?.downloadPath) allFiles.push({ name: 'General Ledger', path: appState.ledgerData.downloadPath });
         if (appState.tccData?.filePath) allFiles.push({ name: 'TCC', path: appState.tccData.filePath });
-        
+
         if (allFiles.length > 0) {
             filesData.innerHTML = allFiles.map(file => `
                 <div class="file-item">
@@ -3211,17 +3255,17 @@ function updateProfileCards() {
 function showToast(options) {
     const container = document.getElementById('toastContainer');
     if (!container) return;
-    
+
     const toast = document.createElement('div');
     toast.className = `toast ${options.type || 'info'}`;
-    
+
     const icons = {
         success: '✅',
         error: '❌',
         warning: '⚠️',
         info: 'ℹ️'
     };
-    
+
     toast.innerHTML = `
         <div class="toast-icon">${icons[options.type] || icons.info}</div>
         <div class="toast-content">
@@ -3230,9 +3274,9 @@ function showToast(options) {
         </div>
         <button class="toast-close" onclick="this.parentElement.remove()">×</button>
     `;
-    
+
     container.appendChild(toast);
-    
+
     // Auto-remove after 4 seconds (except errors which stay 6 seconds)
     const duration = options.type === 'error' ? 6000 : 4000;
     setTimeout(() => {
@@ -3253,7 +3297,7 @@ function displayLiabilitiesResults(result) {
     const liabilitiesData = result.data || [];
     const totalAmount = result.totalAmount || 0;
     const recordCount = liabilitiesData.length || 0;
-    
+
     // Check if we have method-specific data
     const method1Data = result.methods?.method1 || null;
     const method2Data = result.methods?.method2 || null;
@@ -3290,7 +3334,7 @@ function displayLiabilitiesResults(result) {
                     </div>
                 </div>
     `;
-    
+
     if (hasSeparateMethods) {
         tableHtml += `
                 <div class="summary-card">
@@ -3309,7 +3353,7 @@ function displayLiabilitiesResults(result) {
                 </div>
         `;
     }
-    
+
     tableHtml += `
                 <div class="summary-card">
                     <div class="card-icon">✅</div>
@@ -3341,7 +3385,7 @@ function displayLiabilitiesResults(result) {
                         </thead>
                         <tbody>
             `;
-            
+
             method1Data.data.forEach(liability => {
                 const amount = parseFloat(liability.amount || 0);
                 tableHtml += `
@@ -3354,7 +3398,7 @@ function displayLiabilitiesResults(result) {
                     </tr>
                 `;
             });
-            
+
             tableHtml += `
                         </tbody>
                         <tfoot>
@@ -3391,9 +3435,9 @@ function displayLiabilitiesResults(result) {
                     }
                 });
             }
-            
+
             const headersArray = Array.from(allHeaders);
-            
+
             // Calculate the main total (Amount to be Paid) for display
             let mainTotal = 0;
             method2Data.data.forEach(liability => {
@@ -3410,10 +3454,10 @@ function displayLiabilitiesResults(result) {
                     }
                 });
             });
-            
+
             // Use the main total if available, otherwise fall back to method2Data.totalAmount
             const displayTotal = mainTotal > 0 ? mainTotal : method2Data.totalAmount;
-            
+
             tableHtml += `
                 <div class="data-section">
                     <div class="section-header">
@@ -3424,30 +3468,30 @@ function displayLiabilitiesResults(result) {
                             <tr>
                                 <th>Tax Type</th>
             `;
-            
+
             // Add dynamic headers
             headersArray.forEach(header => {
                 tableHtml += `<th>${header}</th>`;
             });
-            
+
             tableHtml += `
                             </tr>
                         </thead>
                         <tbody>
             `;
-            
+
             method2Data.data.forEach(liability => {
                 tableHtml += `
                     <tr>
                         <td>${liability.taxType || 'N/A'}</td>
                 `;
-                
+
                 // Add data for each dynamic column
                 headersArray.forEach(header => {
                     const value = liability.rawData?.[header] || 'N/A';
                     const headerLower = header.toLowerCase();
-                    
-                    if (headerLower.includes('amount') || headerLower.includes('penalty') || 
+
+                    if (headerLower.includes('amount') || headerLower.includes('penalty') ||
                         headerLower.includes('interest') || headerLower.includes('total')) {
                         const numValue = parseFloat(value.replace(/[^0-9.-]+/g, "")) || 0;
                         tableHtml += `<td class="amount-cell">${numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
@@ -3455,13 +3499,13 @@ function displayLiabilitiesResults(result) {
                         tableHtml += `<td>${value}</td>`;
                     }
                 });
-                
+
                 tableHtml += `</tr>`;
             });
-            
+
             // Calculate totals for each column
             const totals = {};
-            
+
             method2Data.data.forEach(liability => {
                 headersArray.forEach(header => {
                     const value = liability.rawData?.[header];
@@ -3473,18 +3517,18 @@ function displayLiabilitiesResults(result) {
                     }
                 });
             });
-            
+
             tableHtml += `
                         </tbody>
                         <tfoot>
                             <tr class="method-total-row">
                                 <td><strong>METHOD 2 TOTAL</strong></td>
             `;
-            
+
             // Add total values for each column
             headersArray.forEach(header => {
                 const headerLower = header.toLowerCase();
-                if (headerLower.includes('amount') || headerLower.includes('penalty') || 
+                if (headerLower.includes('amount') || headerLower.includes('penalty') ||
                     headerLower.includes('interest') || headerLower.includes('total')) {
                     const totalValue = totals[header] || 0;
                     tableHtml += `<td class="amount-cell"><strong>KES ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>`;
@@ -3492,7 +3536,7 @@ function displayLiabilitiesResults(result) {
                     tableHtml += `<td></td>`;
                 }
             });
-            
+
             tableHtml += `
                             </tr>
                         </tfoot>
@@ -3562,7 +3606,7 @@ function displayLiabilitiesResults(result) {
             `;
         }
     }
-    
+
     tableHtml += `</div>`; // Close extraction-results
 
     tableHtml += `
@@ -3629,7 +3673,7 @@ function displayLedgerResults(result) {
             'Sr.No', 'Tax Obligation', 'Tax Period', 'Transaction Date',
             'Reference Number', 'Particulars', 'Transaction Type', 'Debit(Ksh)', 'Credit(Ksh)'
         ];
-        
+
         tableHtml += `
             <div class="data-section">
                 <div class="section-header">
@@ -3640,12 +3684,12 @@ function displayLedgerResults(result) {
                         <tr>
                             <th></th>
         `;
-        
+
         // Add dynamic headers
         headers.forEach(header => {
             tableHtml += `<th>${header.toUpperCase()}</th>`;
         });
-        
+
         tableHtml += `
                         </tr>
                     </thead>
@@ -3656,16 +3700,16 @@ function displayLedgerResults(result) {
             const isTotal = transaction.isTotal || false;
             const rowClass = isTotal ? 'total-row' : '';
             const columns = transaction.columns || [];
-            
+
             tableHtml += `<tr class="${rowClass}"><td></td>`;
-            
+
             // Add dynamic columns
             columns.forEach((value, index) => {
                 const isNumeric = !isNaN(parseFloat(value.replace(/,/g, ''))) && value.match(/[\d,]+\.?\d*/);
                 const cellClass = isNumeric ? 'amount-cell' : '';
                 tableHtml += `<td class="${cellClass}">${value || ''}</td>`;
             });
-            
+
             tableHtml += `</tr>`;
         });
 
@@ -3690,10 +3734,31 @@ function displayLedgerResults(result) {
 
     elements.ledgerResults.innerHTML = tableHtml;
     elements.ledgerResults.classList.remove('hidden');
-    
+
     // Update the UI state to show the green checkmark
     updateUIState();
 }
 
-// Initialize the application when DOM is loaded
-document.addEventListener('DOMContentLoaded', init);
+// Set default download path
+function setDefaultDownloadPath() {
+    const defaultPath = path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
+    if (elements.downloadPath) {
+        elements.downloadPath.value = defaultPath;
+    }
+    updateSidebarFolderPath(defaultPath);
+}
+
+// Update sidebar folder path display
+function updateSidebarFolderPath(folderPath) {
+    if (elements.sidebarFolderPath) {
+        elements.sidebarFolderPath.textContent = folderPath || 'Not set';
+        elements.sidebarFolderPath.title = folderPath || '';
+    }
+}
+
+// Initialize app on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM Content Loaded');
+    setDefaultDownloadPath();
+    init();
+});

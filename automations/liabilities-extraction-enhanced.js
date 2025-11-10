@@ -76,8 +76,8 @@ async function optionExists(locator, value) {
 // Main function to run enhanced liabilities extraction
 async function runEnhancedLiabilitiesExtraction(company, downloadPath, progressCallback) {
     // Create a company-specific subfolder within the user-selected download path
-    const safeCompanyName = company.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const subfolderName = `${safeCompanyName}_${company.pin}_enhanced`;
+    const safeCompanyName = company.name.replace(/[^a-z0-9]/gi, '_').toUpperCase();
+    const subfolderName = `${safeCompanyName}_${company.pin}_ENHANCED`;
     const downloadFolderPath = path.join(downloadPath, subfolderName);
     await fs.mkdir(downloadFolderPath, { recursive: true });
 

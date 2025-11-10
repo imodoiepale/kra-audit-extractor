@@ -487,7 +487,7 @@ window.openFolder = async function(folderPath) {
 // Event Listener
 openFolderBtn.addEventListener('click', async () => {
     const downloadPath = elements.downloadPath?.value || 
-                        path.join(os.homedir(), 'Downloads', 'KRA-Automations');
+                        path.join(os.homedir(), 'Downloads', 'KRA POST PORTUM TOOL');
     await window.openFolder(downloadPath);
 });
 ```
@@ -519,7 +519,7 @@ window.openFile = function(filePath) {
 
 #### D. Default Path Configuration
 
-**Default Location**: `Downloads/KRA-Automations`
+**Default Location**: `Downloads/KRA POST PORTUM TOOL`
 
 **Path Resolution**:
 
@@ -528,7 +528,7 @@ function setDefaultDownloadPath() {
     const defaultPath = path.join(
         os.homedir(),           // C:/Users/YourName
         'Downloads',            // Downloads folder
-        'KRA-Automations'       // App-specific subfolder
+        'KRA POST PORTUM TOOL'       // App-specific subfolder
     );
   
     if (elements.downloadPath) {
@@ -542,7 +542,7 @@ function setDefaultDownloadPath() {
 All automations use `SharedWorkbookManager` to create company-specific folders:
 
 ```
-Downloads/KRA-Automations/
+Downloads/KRA POST PORTUM TOOL/
 └── COMPANY_NAME_PIN123456789_10.11.2025/
     ├── COMPANY_NAME_PIN123456789_CONSOLIDATED_REPORT_10.11.2025.xlsx
     ├── KRA-TCC-PIN123456789-10.11.2025.pdf
@@ -1128,7 +1128,7 @@ for (let i = 0; i < 3; i++) {
 
 ```json
 {
-  "downloadPath": "C:/Users/YourName/Downloads/KRA-Automations",
+  "downloadPath": "C:/Users/YourName/Downloads/KRA POST PORTUM TOOL",
   "outputFormat": "xlsx",
   "theme": "light"
 }

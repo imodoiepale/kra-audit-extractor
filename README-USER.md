@@ -54,7 +54,7 @@
 ### Step 3: Select Output Folder
 - Click the **Settings** button at the bottom
 - Choose where to save extracted files
-- Default: `C:\Users\YourName\Downloads\KRA-Automations`
+- Default: `C:\Users\YourName\Downloads\KRA POST PORTUM TOOL`
 
 ### Step 4: Extract Data
 Choose from the available extractions:
@@ -79,7 +79,7 @@ Choose from the available extractions:
 All files are saved in company-specific folders:
 
 ```
-C:\Users\YourName\Downloads\KRA-Automations\
+C:\Users\YourName\Downloads\KRA POST PORTUM TOOL\
 └── COMPANY_NAME_PIN_DATE\
     ├── COMPANY_NAME_PIN_CONSOLIDATED_REPORT_DATE.xlsx
     ├── GENERAL_LEDGER_PIN_DATE.xlsx

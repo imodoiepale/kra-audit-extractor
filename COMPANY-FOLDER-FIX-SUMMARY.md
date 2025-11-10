@@ -7,7 +7,7 @@ The Tax Compliance Certificate (TCC) downloader was saving files directly to the
 ### Before the Fix
 
 ```
-Downloads/KRA-Automations/
+Downloads/KRA POST PORTUM TOOL/
 ├── KRA-TCC-PIN123456789-10.11.2025.pdf  ❌ (Wrong - in root folder)
 ├── VAT_RETURNS_PIN111111111_10.11.2025.xlsx  ❌ (Wrong - in root folder)
 └── ... (all files mixed together)
@@ -16,7 +16,7 @@ Downloads/KRA-Automations/
 ### After the Fix
 
 ```
-Downloads/KRA-Automations/
+Downloads/KRA POST PORTUM TOOL/
 └── COMPANY_NAME_PIN123456789_10.11.2025/  ✅ (Company folder)
     ├── COMPANY_NAME_PIN123456789_CONSOLIDATED_REPORT_10.11.2025.xlsx
     ├── KRA-TCC-PIN123456789-10.11.2025.pdf
@@ -104,7 +104,7 @@ async function runTCCDownloader(company, downloadPath, progressCallback) {
 
 All automations use `SharedWorkbookManager` to create company-specific folders:
 
-Downloads/KRA-Automations/
+Downloads/KRA POST PORTUM TOOL/
 └── COMPANY_NAME_PIN123456789_10.11.2025/
     ├── COMPANY_NAME_PIN123456789_CONSOLIDATED_REPORT_10.11.2025.xlsx
     ├── KRA-TCC-PIN123456789-10.11.2025.pdf
@@ -141,7 +141,7 @@ class SharedWorkbookManager {
         
         // 3. Create company folder path
         this.companyFolder = path.join(
-            this.downloadPath,                          // Base: Downloads/KRA-Automations
+            this.downloadPath,                          // Base: Downloads/KRA POST PORTUM TOOL
             `${safeCompanyName}_${this.company.pin}_${formattedDateTime}`
         );
         
@@ -244,7 +244,7 @@ Folder: ACME_CORPORATION_A123456789B_10.11.2025/
 
 3. **Expected Result**:
    ```
-   Downloads/KRA-Automations/
+   Downloads/KRA POST PORTUM TOOL/
    └── YOUR_COMPANY_NAME_PIN123456789_10.11.2025/
        └── KRA-TCC-PIN123456789-10.11.2025.pdf  ✅
    ```
