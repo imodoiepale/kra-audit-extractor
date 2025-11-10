@@ -18,6 +18,7 @@ async function runWhVatExtraction(company, dateRange, downloadPath, progressCall
 
     const browser = await chromium.launch({
         headless: false,
+        channel: 'chrome',
         slowMo: 100
     });
 
