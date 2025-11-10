@@ -257,8 +257,19 @@ Downloads and parses Tax Compliance Certificates:
 **Special Features**:
 
 - PDF viewer integration
-- File path management
+- Company-specific folder organization (using SharedWorkbookManager)
 - Certificate history tracking
+- Automatic folder creation per company
+
+**File Organization**:
+```javascript
+// TCC now uses SharedWorkbookManager for company folders
+const workbookManager = new SharedWorkbookManager(company, downloadPath);
+const companyFolder = await workbookManager.initialize();
+
+// PDF saved in company folder:
+// COMPANY_NAME_PIN123456789_10.11.2025/KRA-TCC-PIN123456789-10.11.2025.pdf
+```
 
 #### D. VAT Returns
 
@@ -526,11 +537,33 @@ function setDefaultDownloadPath() {
 }
 ```
 
+**Company-Specific Folder Structure**:
+
+All automations use `SharedWorkbookManager` to create company-specific folders:
+
+```
+Downloads/KRA-Automations/
+└── COMPANY_NAME_PIN123456789_10.11.2025/
+    ├── COMPANY_NAME_PIN123456789_CONSOLIDATED_REPORT_10.11.2025.xlsx
+    ├── KRA-TCC-PIN123456789-10.11.2025.pdf
+    ├── VAT_FILED_RETURNS_PIN123456789_10.11.2025.xlsx
+    ├── WH_VAT_RETURNS_PIN123456789_10.11.2025.xlsx
+    ├── DIRECTOR_DETAILS_PIN123456789_10.11.2025.xlsx
+    └── ... (all other exports)
+```
+
+**Folder Naming**:
+- Format: `{SAFE_COMPANY_NAME}_{PIN}_{DATE}`
+- Company name is sanitized (special chars replaced with `_`)
+- Date format: `DD.MM.YYYY`
+- All files for a company are organized in one folder
+
 **Path Creation**:
 
-- Automatically creates directory if it doesn't exist
-- Uses `fs.mkdirSync(path, { recursive: true })`
+- Automatically creates company folder if it doesn't exist
+- Uses `fs.mkdir(path, { recursive: true })`
 - Ensures proper permissions
+- Each automation run creates/reuses the company folder for that day
 
 ---
 

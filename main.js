@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -115,6 +115,77 @@ ipcMain.handle('open-folder', async (event, folderPath) => {
   } catch (error) {
     return { success: false, error: error.message };
   }
+});
+
+// Electron-native fetch handler for packaged apps
+ipcMain.handle('electron-fetch', async (event, { url, options }) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const requestOptions = {
+        method: options.method || 'GET',
+        url: url
+      };
+
+      const request = net.request(requestOptions);
+
+      // Set headers
+      if (options.headers) {
+        Object.entries(options.headers).forEach(([key, value]) => {
+          request.setHeader(key, value);
+        });
+      }
+
+      // Handle response
+      request.on('response', (response) => {
+        const chunks = [];
+        
+        response.on('data', (chunk) => {
+          chunks.push(chunk);
+        });
+
+        response.on('end', () => {
+          try {
+            const body = Buffer.concat(chunks).toString();
+            const result = {
+              ok: response.statusCode >= 200 && response.statusCode < 300,
+              status: response.statusCode,
+              statusText: response.statusMessage,
+              headers: response.headers,
+              body: body
+            };
+            
+            // Try to parse as JSON if possible
+            try {
+              result.json = JSON.parse(body);
+            } catch (e) {
+              // Not JSON, that's okay
+            }
+            
+            resolve(result);
+          } catch (error) {
+            reject(error);
+          }
+        });
+
+        response.on('error', (error) => {
+          reject(error);
+        });
+      });
+
+      request.on('error', (error) => {
+        reject(error);
+      });
+
+      // Send request body if present
+      if (options.body) {
+        request.write(options.body);
+      }
+
+      request.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
 });
 
 // Manufacturer Details API handler
@@ -273,12 +344,27 @@ ipcMain.handle('run-tcc-downloader', async (event, { company, downloadPath }) =>
   }
 });
 
-// Open file handler
+// Open file handler (legacy - kept for backward compatibility)
 ipcMain.on('open-file', (event, filePath) => {
   shell.openPath(filePath).catch(err => {
     console.error('Failed to open file:', err);
     dialog.showErrorBox('File Error', `Could not open file at: ${filePath}`);
   });
+});
+
+// Open file handler (new - returns promise for better error handling)
+ipcMain.handle('open-file-external', async (event, filePath) => {
+  try {
+    const result = await shell.openPath(filePath);
+    if (result) {
+      // If result is not empty, there was an error
+      throw new Error(result);
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to open file:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // Legacy extraction handler (for backward compatibility)

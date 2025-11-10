@@ -1,5 +1,5 @@
 const { chromium } = require('playwright');
-const fetch = require('node-fetch');
+const fetch = require('./electron-fetch-wrapper');  // Use Electron-safe fetch wrapper
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs').promises;
@@ -8,6 +8,24 @@ const SharedWorkbookManager = require('./shared-workbook-manager');
 
 // Manufacturer Details API Configuration
 const MANUFACTURER_API_URL = 'https://itax.kra.go.ke/KRA-Portal/manufacturerAuthorizationController.htm?actionCode=fetchManDtl';
+
+// KRA API Headers - Comprehensive browser-like headers
+const KRA_API_HEADERS = {
+    'Accept': 'application/json, text/javascript, */*; q=0.01',
+    'Accept-Language': 'en-US,en;q=0.9,sw;q=0.8',
+    'Connection': 'keep-alive',
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    'Origin': 'https://itax.kra.go.ke',
+    'Referer': 'https://itax.kra.go.ke/KRA-Portal/manufacturerAuthorizationController.htm?actionCode=appForManufacturerAuth',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-origin',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+    'X-Requested-With': 'XMLHttpRequest',
+    'sec-ch-ua': '"Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"'
+};
 
 // TODO: Implement a function to dynamically fetch or use stored authentication cookies.
 // This will likely involve a login step to the KRA portal.
@@ -23,18 +41,8 @@ async function getApiHeaders(page) {
         throw new Error('Could not retrieve session cookie for API call.');
     }
     return {
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'Accept-Language': 'en-US,en;q=0.9,sw;q=0.8',
-        'Connection': 'keep-alive',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Cookie': cookie,
-        'Origin': 'https://itax.kra.go.ke',
-        'Referer': 'https://itax.kra.go.ke/KRA-Portal/manufacturerAuthorizationController.htm?actionCode=appForManufacturerAuth',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-        'X-Requested-With': 'XMLHttpRequest'
+        ...KRA_API_HEADERS,
+        'Cookie': cookie
     };
 }
 
@@ -55,15 +63,7 @@ async function fetchManufacturerDetails(company, progressCallback) {
 
         const response = await fetch(MANUFACTURER_API_URL, {
             method: 'POST',
-            headers: {
-                'Accept': 'application/json, text/javascript, */*; q=0.01',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Origin': 'https://itax.kra.go.ke',
-                'Referer': 'https://itax.kra.go.ke/KRA-Portal/manufacturerAuthorizationController.htm?actionCode=appForManufacturerAuth',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
+            headers: KRA_API_HEADERS,
             body: formData.toString(),
         });
 

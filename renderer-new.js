@@ -2487,15 +2487,17 @@ function displayTCCResults(data) {
 }
 
 // Expose globally for inline onclick handlers
-window.viewTCCPDF = function(filePath) {
-    const pdfViewer = document.getElementById('tccPdfViewer');
-    const pdfFrame = document.getElementById('tccPdfFrame');
-    
-    if (pdfViewer && pdfFrame) {
-        // Convert file path to file:// URL
-        const fileUrl = `file:///${filePath.replace(/\\/g, '/')}`;
-        pdfFrame.src = fileUrl;
-        pdfViewer.classList.remove('hidden');
+window.viewTCCPDF = async function(filePath) {
+    try {
+        // Open PDF in system default viewer instead of iframe (more reliable)
+        await ipcRenderer.invoke('open-file-external', filePath);
+    } catch (error) {
+        console.error('Error opening PDF:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Cannot Open PDF',
+            message: `Failed to open PDF file: ${error.message}`
+        });
     }
 };
 
@@ -2509,8 +2511,17 @@ window.closeTCCPDFViewer = function() {
     }
 };
 
-window.openFile = function(filePath) {
-    ipcRenderer.send('open-file', filePath);
+window.openFile = async function(filePath) {
+    try {
+        await ipcRenderer.invoke('open-file-external', filePath);
+    } catch (error) {
+        console.error('Error opening file:', error);
+        await showMessage({
+            type: 'error',
+            title: 'Cannot Open File',
+            message: `Failed to open file: ${error.message}`
+        });
+    }
 };
 
 window.openFolder = async function(folderPath) {

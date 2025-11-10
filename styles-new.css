@@ -1326,7 +1326,7 @@ body {
 
 .data-table {
     width: 100%;
-    min-width: 800px;
+    min-width: max-content;
     border-collapse: collapse;
     font-size: 13px;
     display: table;
@@ -1364,6 +1364,7 @@ body {
 .data-table td {
     padding: 12px 16px;
     color: var(--gray-700);
+    white-space: nowrap;
 }
 
 .details-subsection {
@@ -1559,10 +1560,37 @@ body {
     background: var(--gray-500);
 }
 
-/* Ensure extraction-results container is also scrollable */
+/* Ensure extraction-results container allows scrolling */
 .extraction-results {
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: visible;
+}
+
+/* Data sections should allow horizontal scrolling */
+.data-section {
+    overflow-x: auto;
+    overflow-y: visible;
+    max-width: 100%;
+    margin-bottom: 20px;
+}
+
+/* Custom scrollbar for data sections */
+.data-section::-webkit-scrollbar {
+    height: 8px;
+}
+
+.data-section::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 4px;
+}
+
+.data-section::-webkit-scrollbar-thumb {
+    background: var(--gray-400);
+    border-radius: 4px;
+}
+
+.data-section::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-500);
 }
 
 /* Ensure all table wrappers are scrollable */
@@ -1572,29 +1600,60 @@ body {
     overflow-y: visible;
     max-width: 100%;
     border-radius: 8px;
+    -webkit-overflow-scrolling: touch;
 }
 
-/* Prevent text wrapping in table cells for better horizontal scrolling */
+/* No text wrapping in table cells - use horizontal scroll */
 .data-table th,
 .data-table td {
     white-space: nowrap;
 }
 
-/* Allow certain columns to wrap if needed */
+/* Allow wrapping only for long description/particulars columns */
 .data-table td.particulars,
+.data-table td.description,
 .data-table td[data-wrap="true"] {
     white-space: normal;
-    max-width: 300px;
+    max-width: 400px;
+    word-break: break-word;
 }
 
-/* Fullscreen responsive behavior */
-@media (min-width: 1920px) {
+/* Ensure numbers and amounts are readable */
+.data-table td[class*="amount"],
+.data-table td[class*="balance"],
+.data-table td[class*="debit"],
+.data-table td[class*="credit"] {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+    white-space: nowrap;
+    min-width: 120px;
+}
+
+/* Fullscreen responsive behavior - tables scale with window */
+@media (min-width: 1400px) {
     .data-table {
-        min-width: 1200px;
+        font-size: 14px;
     }
     
-    .ledger-table {
-        min-width: 1400px;
+    .data-table th,
+    .data-table td {
+        padding: 14px 18px;
+    }
+}
+
+@media (min-width: 1920px) {
+    .data-table {
+        font-size: 15px;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 16px 20px;
+    }
+    
+    .data-table td.particulars,
+    .data-table td.description {
+        max-width: 600px;
     }
 }
 

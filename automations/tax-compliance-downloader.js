@@ -2,6 +2,25 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs').promises;
 const { createWorker } = require('tesseract.js');
+const SharedWorkbookManager = require('./shared-workbook-manager');
+
+// KRA API Headers - Comprehensive browser-like headers
+const KRA_API_HEADERS = {
+    'Accept': 'application/json, text/javascript, */*; q=0.01',
+    'Accept-Language': 'en-US,en;q=0.9,sw;q=0.8',
+    'Connection': 'keep-alive',
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    'Origin': 'https://itax.kra.go.ke',
+    'Referer': 'https://itax.kra.go.ke/KRA-Portal/',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-origin',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+    'X-Requested-With': 'XMLHttpRequest',
+    'sec-ch-ua': '"Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"'
+};
 
 // --- Main Orchestration Function ---
 async function runTCCDownloader(company, downloadPath, progressCallback) {
@@ -13,17 +32,27 @@ async function runTCCDownloader(company, downloadPath, progressCallback) {
 
     let browser = null;
     try {
+        // Initialize SharedWorkbookManager for company folder
+        const workbookManager = new SharedWorkbookManager(company, downloadPath);
+        const companyFolder = await workbookManager.initialize();
+
+        progressCallback({
+            stage: 'Tax Compliance',
+            message: `Company folder: ${companyFolder}`,
+            progress: 10
+        });
+
         browser = await chromium.launch({ headless: false, channel: 'chrome' });
         const context = await browser.newContext();
         const page = await context.newPage();
         page.setDefaultTimeout(60000); // 60 seconds timeout
 
-        const loginSuccess = await loginToKRA(page, company, downloadPath, progressCallback);
+        const loginSuccess = await loginToKRA(page, company, companyFolder, progressCallback);
         if (!loginSuccess) {
             throw new Error('Login failed. Please check credentials and try again.');
         }
 
-        const { filePath, tableData } = await downloadTCC(page, company, downloadPath, progressCallback);
+        const { filePath, tableData } = await downloadTCC(page, company, companyFolder, progressCallback);
 
         await browser.close();
 
@@ -37,7 +66,9 @@ async function runTCCDownloader(company, downloadPath, progressCallback) {
             success: true,
             message: 'TCC downloaded successfully.',
             files: [filePath],
-            tableData: tableData
+            tableData: tableData,
+            companyFolder: companyFolder,
+            downloadPath: companyFolder
         };
     } catch (error) {
         console.error('Error during TCC download:', error);
