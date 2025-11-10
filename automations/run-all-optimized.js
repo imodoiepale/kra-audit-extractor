@@ -643,9 +643,10 @@ async function runLedgerExtractionOptimized(page, company, workbookManager, prog
         }
 
         // Export to shared workbook
-        await exportLedgerToSheet(workbookManager, { data: extractedData });
+        const ledgerDataObject = { data: extractedData, recordCount: extractedData.length };
+        await exportLedgerToSheet(workbookManager, ledgerDataObject);
         
-        progressCallback({ log: 'General ledger added to consolidated report' });
+        progressCallback({ log: `General ledger added to consolidated report (${extractedData.length} records)` });
         return { success: true, data: extractedData, message: 'Ledger extraction completed' };
     } catch (error) {
         progressCallback({ log: `Ledger extraction error: ${error.message}`, logType: 'warning' });
